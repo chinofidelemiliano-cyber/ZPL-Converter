@@ -1,14 +1,17 @@
 import {rasterToZpl,applyPrintSettings} from './converter.js';
-import {drawEditor,initEditor} from './editor.js';
+import {drawEditor,initEditor,useEditorFont,addEditorElement} from './editor.js';
+import {initUnits,readMm,fromMm,unitLabel} from './units.js';
+import {initGallery} from './gallery.js';
 const $=id=>document.getElementById(id);
 let source=null,request=0,activeTab="image";
+initUnits(render);
 function status(message){$('status').textContent=message;}
 function clear(){ $('code').value='';$('copy').disabled=$('download').disabled=true;$('preview').hidden=true;$('empty').hidden=false; }
 function render(){
  $('thresholdValue').textContent=$('threshold').value;
  if(!source&&activeTab==="image")return;
  try{
- const mmW=Number($('width').value),mmH=Number($('height').value),dpi=Number($('dpi').value);
+ const mmW=readMm('width'),mmH=readMm('height'),dpi=Number($('dpi').value);
  if(mmW<1||mmW>200||mmH<1||mmH>300||!Number.isFinite(mmW+mmH))throw new Error('Usa un ancho entre 1 y 200 mm y un alto entre 1 y 300 mm.');
  const w=Math.round(mmW*dpi/25.4),h=Math.round(mmH*dpi/25.4);
  if(w*h>16000000)throw new Error('La etiqueta es demasiado grande. Reduce el tamaño o la resolución.');
@@ -26,7 +29,7 @@ function render(){
  const result=rasterToZpl(ctx.getImageData(0,0,w,h).data,w,h);
  $('code').value=applyPrintSettings(result.zpl,Number($('copies').value),$('speed').value===''?'':Number($('speed').value));$('preview').hidden=false;$('empty').hidden=true;
  $('copy').disabled=$('download').disabled=false;$('dimensions').textContent=`${w} × ${h} dots`;
- $('info').textContent=`${mmW} × ${mmH} mm · ${dpi} dpi · ${$('copies').value} etiqueta(s)`;status('Conversión lista. Puedes copiar o descargar el código.');
+ $('info').textContent=`${Number(fromMm(mmW,$('units').value).toFixed(4))} × ${Number(fromMm(mmH,$('units').value).toFixed(4))} ${unitLabel()} · ${dpi} dpi · ${$('copies').value} etiqueta(s)`;status('Conversión lista. Puedes copiar o descargar el código.');
  }catch(error){clear();status(error.message);}
 }
 async function load(file){
@@ -46,9 +49,13 @@ $('copy').addEventListener('click',async()=>{try{await navigator.clipboard.write
 $('download').addEventListener('click',()=>{const url=URL.createObjectURL(new Blob([$('code').value],{type:'text/plain'}));const a=document.createElement('a');a.href=url;a.download='etiqueta.zpl';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status('Archivo ZPL descargado.');});
 
 initEditor(render,status);
-for(const tab of ['image','editor'])$('tab-'+tab).addEventListener('click',()=>{
+function switchTab(tab){
+ for(const t of ['image','editor','gallery']){ $('tab-'+t).classList.toggle('active',t===tab);$('tab-'+t).setAttribute('aria-pressed',String(t===tab)); }
+ $('gallery').hidden=tab!=='gallery';$('workspace').hidden=tab==='gallery';
+ if(tab==='gallery')return;
  activeTab=tab;
- for(const t of ['image','editor']){ $('tab-'+t).classList.toggle('active',t===tab);$('tab-'+t).setAttribute('aria-pressed',String(t===tab)); }
  $('image-tools').hidden=$('image-adjustments').hidden=tab!=='image';$('editor-tools').hidden=tab!=='editor';
  clear();render();if(tab==='image'&&!source)status('Carga una imagen para empezar.');
-});
+}
+for(const tab of ['image','editor','gallery'])$('tab-'+tab).addEventListener('click',()=>switchTab(tab));
+initGallery(font=>{switchTab('editor');useEditorFont(font);},type=>{switchTab('editor');addEditorElement(type);});

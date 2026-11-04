@@ -1,6 +1,8 @@
 import {rasterToZpl} from './converter.js';
 import {code39} from './barcode.js';
 import {makeQr} from './qr.js';
+import {readMm,writeMm,unitLabel} from './units.js';
+import {fonts,fontById} from './fonts.js';
 const $=id=>document.getElementById(id);
 const elements=[];let selected=null,redraw,report,nextId=1;
 function current(){return elements.find(e=>e.id===selected);}
@@ -11,18 +13,19 @@ function updateList(){
 function properties(){
  const e=current();$('properties').hidden=!e;if(!e)return;
  $('content-field').hidden=!['text','barcode','qr','url'].includes(e.type);$('text-properties').hidden=e.type!=='text';$('size-properties').hidden=e.type==='text';$('box-properties').hidden=e.type!=='box';$('editor-image-properties').hidden=e.type!=='image';
- for(const [id,key] of Object.entries({'element-text':'text','element-x':'x','element-y':'y','element-w':'w','element-h':'h','font-size':'size','line-width':'line','element-mode':'mode'}))$(id).value=e[key]??'';
- $('bold').checked=!!e.bold;
+ for(const [id,key] of Object.entries({'element-text':'text','element-x':'x','element-y':'y','element-w':'w','element-h':'h','font-size':'size','line-width':'line','element-mode':'mode'})){if(['x','y','w','h','size','line'].includes(key))writeMm(id,e[key]);else $(id).value=e[key]??'';}
+ $('bold').checked=!!e.bold;$('italic').checked=!!e.italic;$('font-family').value=e.font||'arial';
  $('element-text').placeholder=e.type==='url'?'https://tusitio.com':e.type==='barcode'?'Escribe tu código, por ejemplo PRODUCTO123':'Escribe tu contenido';
  $('content-help').textContent=e.type==='url'?'El QR abrirá este enlace al escanearlo.':e.type==='barcode'?'Code 39: mayúsculas A–Z, números y - . $ / + %.':e.type==='qr'?'Texto, números o información para escanear.':'Admite varias líneas y acentos.';
  $('element-h').closest('.field').hidden=['qr','url'].includes(e.type);
- $('element-w').previousElementSibling.textContent=['qr','url'].includes(e.type)?'Tamaño del QR (mm)':'Ancho (mm)';
+ $('element-w').previousElementSibling.textContent=['qr','url'].includes(e.type)?`Tamaño del QR (${unitLabel()})`:`Ancho (${unitLabel()})`;
 }
-function add(type,extra={}){const e={id:nextId++,type,x:5,y:5,w:40,h:15,size:5,line:.4,bold:false,mode:'threshold',text:'',...(['qr','url'].includes(type)?{w:25,h:25}:{}),...extra};elements.push(e);selected=e.id;updateList();properties();redraw();if(['text','barcode','qr','url'].includes(type))report(type==='url'?'Escribe el enlace web de tu QR en el campo Contenido.':'Escribe el contenido del elemento en el campo Contenido.');}
+function add(type,extra={}){const e={id:nextId++,type,x:5,y:5,w:40,h:15,size:5,line:.4,bold:false,italic:false,font:'arial',mode:'threshold',text:'',...(['qr','url'].includes(type)?{w:25,h:25}:{}),...extra};elements.push(e);selected=e.id;updateList();properties();redraw();if(['text','barcode','qr','url'].includes(type))report(type==='url'?'Escribe el enlace web de tu QR en el campo Contenido.':'Escribe el contenido del elemento en el campo Contenido.');}
 export function initEditor(render,status){
  redraw=render;report=status;
+ for(const font of fonts){const option=document.createElement('option');option.value=font.id;option.textContent=font.name;$('font-family').append(option);}
  for(const type of ['text','box','barcode','qr','url'])$('add-'+type).addEventListener('click',()=>add(type));
- for(const [id,key] of Object.entries({'element-text':'text','element-x':'x','element-y':'y','element-w':'w','element-h':'h','font-size':'size','line-width':'line','element-mode':'mode','bold':'bold'}))$(id).addEventListener('input',()=>{const e=current();if(!e)return;e[key]=id==='bold'?$(id).checked:['text','mode'].includes(key)?$(id).value:Number($(id).value);updateList();redraw();});
+ for(const [id,key] of Object.entries({'element-text':'text','element-x':'x','element-y':'y','element-w':'w','element-h':'h','font-size':'size','line-width':'line','element-mode':'mode','bold':'bold','italic':'italic','font-family':'font'}))$(id).addEventListener('input',()=>{const e=current();if(!e)return;e[key]=['bold','italic'].includes(id)?$(id).checked:['text','mode','font'].includes(key)?$(id).value:readMm(id);updateList();redraw();});
  $('delete-element').addEventListener('click',()=>{const e=current();if(!e)return;e.bitmap?.close();elements.splice(elements.indexOf(e),1);selected=elements.at(-1)?.id??null;updateList();properties();redraw();});
  $('editor-image').addEventListener('change',async event=>{
   const file=event.target.files[0];if(!file)return;
@@ -40,7 +43,7 @@ export function drawEditor(ctx,dpi,width,height){
   const x=Math.round(e.x*unit),y=Math.round(e.y*unit),w=Math.round(e.w*unit),h=Math.round(e.h*unit);
   ctx.fillStyle='black';ctx.strokeStyle='black';
   if(e.type==='text'){
-   ctx.font=`${e.bold?'bold':'normal'} ${Math.round(e.size*unit)}px Arial, sans-serif`;ctx.textBaseline='top';
+   ctx.font=`${e.italic?'italic':'normal'} ${e.bold?'bold':'normal'} ${Math.round(e.size*unit)}px ${fontById(e.font).family}`;ctx.textBaseline='top';
    e.text.split('\n').forEach((line,i)=>ctx.fillText(line,x,y+i*e.size*unit*1.2));
   }else if(e.type==='box'){
    if(!Number.isFinite(e.line)||e.line<.1||e.line>10)throw new Error('El grosor del borde debe estar entre 0.1 y 10 mm.');
@@ -68,3 +71,10 @@ export function drawEditor(ctx,dpi,width,height){
   }
  }
 }
+
+export function useEditorFont(font){
+ let e=current();
+ if(!e||e.type!=='text'){add('text',{font});e=current();}else{e.font=font;properties();redraw();}
+ report('Fuente aplicada. Escribe o edita el contenido de tu texto.');
+}
+export function addEditorElement(type){if(type==='image')$('editor-image').click();else add(type);}
