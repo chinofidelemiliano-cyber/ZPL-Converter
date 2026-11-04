@@ -1,14 +1,14 @@
-import {rasterToZpl,applyPrintSettings} from './converter.js?v=native-v3';
-import {drawEditor,initEditor,useEditorFont,addEditorElement} from './editor.js?v=native-v3';
-import {initUnits,readMm,fromMm,unitLabel,writeMm} from './units.js?v=native-v3';
-import {mediaSettings,applyMedia} from './media.js?v=native-v3';
-import {buildPuzzle} from './puzzle.js?v=native-v3';
-import {initGallery} from './gallery.js?v=native-v3';
+import {rasterToZpl,applyPrintSettings} from './converter.js?v=native-v4';
+import {drawEditor,initEditor,useEditorFont,addEditorElement,editorPrintJob} from './editor.js?v=native-v4';
+import {initUnits,readMm,fromMm,unitLabel,writeMm} from './units.js?v=native-v4';
+import {mediaSettings,applyMedia} from './media.js?v=native-v4';
+import {buildPuzzle} from './puzzle.js?v=native-v4';
+import {initGallery} from './gallery.js?v=native-v4';
 const $=id=>document.getElementById(id);
 let source=null,request=0,activeTab="image";
 initUnits(render);
 function status(message){$('status').textContent=message;}
-function clear(){ $('puzzle-summary').textContent='';$('element-commands').textContent=''; $('code').value='';$('copy').disabled=$('download').disabled=true;$('preview').hidden=true;$('empty').hidden=false; }
+function clear(){ $('puzzle-summary').textContent='';$('series-job-info').textContent='';$('series-job-info').hidden=true;$('sequence-preview').textContent='';$('element-commands').textContent=''; $('code').value='';$('copy').disabled=$('download').disabled=true;$('preview').hidden=true;$('empty').hidden=false; }
 function render(){
  updateStock();
  $('thresholdValue').textContent=$('threshold').value;
@@ -19,7 +19,7 @@ function render(){
  $('pw').value=w;$('ll').value=h;
  if(w*h>16000000)throw new Error('La etiqueta es demasiado grande. Reduce el tamaño o la resolución.');
  const media=mediaSettings($('media').value,readMm('gap'),mmH,dpi);
- const copies=Number($('copies').value),speed=$('speed').value===''?'':Number($('speed').value);
+ const copies=Number($('copies').value),speed=$('speed').value;
  if(!source&&activeTab!=='editor')return;
  const canvas=$('preview');
  if(activeTab==='puzzle'){
@@ -46,9 +46,11 @@ function render(){
  }
  const zpl=activeTab==='editor'?nativeZpl:rasterToZpl(ctx.getImageData(0,0,w,h).data,w,h).zpl;
  if(typeof zpl!=='string')throw new Error('No se pudo generar ZPL nativo.');
- $('code').value=applyMedia(applyPrintSettings(zpl,copies,speed),media.mode);$('preview').hidden=false;$('empty').hidden=true;
+ const job=activeTab==='editor'?editorPrintJob(w,h,dpi,copies,speed,media.mode):{zpl:applyMedia(applyPrintSettings(zpl,copies,speed),media.mode),total:copies,hasSequence:false};
+ $('code').value=job.zpl;$('series-job-info').hidden=!job.hasSequence;$('series-job-info').textContent=job.hasSequence?`${job.numbers} números distintos × ${copies} copias de cada uno = ${job.total} etiquetas. Se imprimen primero las copias de un número y luego el siguiente.`:'';
+ $('copies').previousElementSibling.textContent=job.hasSequence?'Copias de cada número · ^PQ':'Cantidad de etiquetas · ^PQ';$('preview').hidden=false;$('empty').hidden=true;
  $('copy').disabled=$('download').disabled=false;$('dimensions').textContent=`${w} × ${h} dots`;
- $('info').textContent=`${Number(fromMm(mmW,$('units').value).toFixed(4))} × ${Number(fromMm(mmH,$('units').value).toFixed(4))} ${unitLabel()} · ${dpi} dpi · ${$('copies').value} etiqueta(s)`;status('Conversión lista. Puedes copiar o descargar el código.');
+ $('info').textContent=`${Number(fromMm(mmW,$('units').value).toFixed(4))} × ${Number(fromMm(mmH,$('units').value).toFixed(4))} ${unitLabel()} · ${dpi} dpi · ${job.total} etiqueta(s)`;status('Conversión lista. Puedes copiar o descargar el código.');
  }catch(error){clear();status(error.message);}
 }
 async function load(file){
@@ -84,6 +86,7 @@ function switchTab(tab,navigate=true){
  $('image-tools').hidden=$('image-adjustments').hidden=!['image','puzzle'].includes(tab);$('editor-tools').hidden=tab!=='editor';$('puzzle-tools').hidden=tab!=='puzzle';
  if(tab==='editor')$('zpl-output').open=true;
  $('preview-note').textContent=tab==='editor'?'Vista previa aproximada. Las fuentes, sus tamaños y los códigos nativos los interpreta la impresora.':'Vista previa del mapa de bits.';
+ $('series-job-info').hidden=tab!=='editor';
  $('copies').previousElementSibling.textContent=tab==='puzzle'?'Copias por pieza · ^PQ':'Cantidad de etiquetas · ^PQ';
  clear();render();if(tab!=='editor'&&!source)status('Carga una imagen para empezar.');
 }

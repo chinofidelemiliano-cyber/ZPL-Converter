@@ -1,5 +1,5 @@
 import {readFile,writeFile} from 'node:fs/promises';
-const release='native-v3';
+const release='native-v4';
 const pages={ 'index.html':['image','Imagen a ZPL'], 'editor.html':['editor','Crea tu etiqueta desde cero'], 'rompecabezas.html':['puzzle','Rompecabezas de etiquetas'], 'fuentes.html':['gallery','Fuentes y muestrario'] };
 const template=await readFile(new URL('index.html',import.meta.url),'utf8');
 for(const [file,[page,title]] of Object.entries(pages)){

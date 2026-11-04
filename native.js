@@ -1,7 +1,7 @@
-import {fontCommand} from './fonts.js?v=native-v3';
-import {code39} from './barcode.js?v=native-v3';
-import {makeQr} from './qr.js?v=native-v3';
-// Encode every UTF-8 byte so user content cannot introduce ZPL commands.
+import {fontCommand} from './fonts.js?v=native-v4';
+import {code39} from './barcode.js?v=native-v4';
+import {makeQr} from './qr.js?v=native-v4';
+// Escape command delimiters and non-ASCII UTF-8 bytes in field content.
 export const fieldData=text=>Array.from(new TextEncoder().encode(text),b=>b>=32&&b<=126&&![94,126,92].includes(b)?String.fromCharCode(b):'\\'+b.toString(16).padStart(2,'0').toUpperCase()).join('');
 export function nativeElement(e,dpi,labelWidth,labelHeight){
  const unit=dpi/25.4,px=mm=>Math.round(mm*unit);

@@ -1,19 +1,24 @@
-import {nativeElement,graphicField,nativeLabel} from './native.js?v=native-v3';
-import {rasterToZpl} from './converter.js?v=native-v3';
-import {code39} from './barcode.js?v=native-v3';
-import {makeQr} from './qr.js?v=native-v3';
-import {readMm,writeMm,unitLabel} from './units.js?v=native-v3';
-import {fonts,fontById} from './fonts.js?v=native-v3';
+import {nativeElement,graphicField,nativeLabel} from './native.js?v=native-v4';
+import {rasterToZpl} from './converter.js?v=native-v4';
+import {code39} from './barcode.js?v=native-v4';
+import {makeQr} from './qr.js?v=native-v4';
+import {readMm,writeMm,unitLabel} from './units.js?v=native-v4';
+import {fonts,fontById} from './fonts.js?v=native-v4';
+import {barcodeContent,sequenceCount} from './sequence.js?v=native-v4';
+import {buildEditorJob} from './jobs.js?v=native-v4';
 const $=id=>document.getElementById(id);
-const elements=[];let selected=null,redraw,report,nextId=1;
+const elements=[];let selected=null,redraw,report,nextId=1;let renderedEntries=[];
 function current(){return elements.find(e=>e.id===selected);}
 function updateList(){
  $('elements').replaceChildren();
- for(const e of elements){const button=document.createElement('button');button.textContent=({text:'Texto',box:'Recuadro',barcode:'Code 39',qr:'Código QR',url:'QR con enlace',image:'Imagen gráfica (^GFA)'})[e.type]+': '+(e.text||e.name||(e.type==='box'?'Borde':'Sin contenido'));button.classList.toggle('selected',e.id===selected);button.setAttribute('aria-pressed',String(e.id===selected));button.addEventListener('click',()=>{selected=e.id;updateList();properties();});$('elements').append(button);}
+ for(const e of elements){const button=document.createElement('button');button.textContent=({text:'Texto',box:'Recuadro',barcode:'Code 39',qr:'Código QR',url:'QR con enlace',image:'Imagen gráfica (^GFA)'})[e.type]+': '+(e.type==='barcode'&&e.numberMode==='sequence'?'Serie desde '+e.sequenceStart:(e.text||e.name||(e.type==='box'?'Borde':'Sin contenido')));button.classList.toggle('selected',e.id===selected);button.setAttribute('aria-pressed',String(e.id===selected));button.addEventListener('click',()=>{selected=e.id;updateList();properties();});$('elements').append(button);}
 }
 function properties(){
  const e=current();$('properties').hidden=!e;if(!e)return;
- $('content-field').hidden=!['text','barcode','qr','url'].includes(e.type);$('text-properties').hidden=e.type!=='text';$('size-properties').hidden=e.type==='text';$('box-properties').hidden=e.type!=='box';$('editor-image-properties').hidden=e.type!=='image';
+ $('content-field').hidden=!['text','barcode','qr','url'].includes(e.type)||(e.type==='barcode'&&e.numberMode==='sequence');
+ $('barcode-options').hidden=e.type!=='barcode';
+ for(const [id,key] of Object.entries({'barcode-number-mode':'numberMode','sequence-start':'sequenceStart','sequence-step':'sequenceStep','sequence-count':'sequenceCount','sequence-pad':'sequencePad','sequence-prefix':'sequencePrefix','sequence-suffix':'sequenceSuffix'}))$(id).value=e[key]??'';
+ $('sequence-options').hidden=e.numberMode!=='sequence';$('text-properties').hidden=e.type!=='text';$('size-properties').hidden=e.type==='text';$('box-properties').hidden=e.type!=='box';$('editor-image-properties').hidden=e.type!=='image';
  for(const [id,key] of Object.entries({'element-text':'text','element-x':'x','element-y':'y','element-w':'w','element-h':'h','font-size':'size','line-width':'line','element-mode':'mode'})){if(['x','y','w','h','size','line'].includes(key))writeMm(id,e[key]);else $(id).value=e[key]??'';}
  $('fo-x').value=Math.round(e.x*Number($('dpi').value)/25.4);$('fo-y').value=Math.round(e.y*Number($('dpi').value)/25.4);
  $('bold').checked=!!e.bold;$('italic').checked=!!e.italic;$('font-family').value=e.font||'arial';$('font-file').value=e.fontFile||'';$('font-file-card').hidden=!fontById(e.font).requiresFile;
@@ -22,9 +27,14 @@ function properties(){
  $('element-h').closest('.field').hidden=['qr','url'].includes(e.type);
  $('element-w').previousElementSibling.textContent=['qr','url'].includes(e.type)?`Tamaño del QR (${unitLabel()})`:`Ancho (${unitLabel()})`;
 }
-function add(type,extra={}){const e={id:nextId++,type,x:5,y:5,w:40,h:15,size:5,line:.4,bold:false,italic:false,font:'arial',fontFile:'',mode:'threshold',text:'',...(['qr','url'].includes(type)?{w:25,h:25}:{}),...extra};elements.push(e);selected=e.id;updateList();properties();redraw();if(['text','barcode','qr','url'].includes(type))report(type==='url'?'Escribe el enlace web de tu QR en el campo Contenido.':'Escribe el contenido del elemento en el campo Contenido.');}
+function add(type,extra={}){const e={id:nextId++,type,x:5,y:5,w:40,h:15,size:5,line:.4,bold:false,italic:false,font:'arial',fontFile:'',numberMode:'fixed',sequenceStart:'1',sequenceStep:'1',sequenceCount:10,sequencePad:4,sequencePrefix:'',sequenceSuffix:'',mode:'threshold',text:'',...(['qr','url'].includes(type)?{w:25,h:25}:{}),...extra};elements.push(e);selected=e.id;updateList();properties();redraw();if(['text','barcode','qr','url'].includes(type))report(type==='url'?'Escribe el enlace web de tu QR en el campo Contenido.':'Escribe el contenido del elemento en el campo Contenido.');}
 export function initEditor(render,status){
  redraw=render;report=status;
+ for(const [id,key] of Object.entries({'barcode-number-mode':'numberMode','sequence-start':'sequenceStart','sequence-step':'sequenceStep','sequence-count':'sequenceCount','sequence-pad':'sequencePad','sequence-prefix':'sequencePrefix','sequence-suffix':'sequenceSuffix'}))$(id).addEventListener('input',()=>{
+  const e=current();if(!e)return;e[key]=$(id).value;
+  if(key==='numberMode'){properties();}
+  updateList();redraw();
+ });
  $('new-label').addEventListener('click',()=>{for(const e of elements)e.bitmap?.close();elements.length=0;selected=null;updateList();properties();redraw();report('Etiqueta nueva. Añade texto, códigos o recuadros: se exportarán como ZPL nativo.');});
  for(const [id,key,target] of [['fo-x','x','element-x'],['fo-y','y','element-y']])$(id).addEventListener('input',()=>{
   const e=current();if(!e)return;const dots=$(id).value===''?NaN:Number($(id).value);e[key]=Number.isInteger(dots)?dots*25.4/Number($('dpi').value):NaN;writeMm(target,e[key]);redraw();
@@ -40,9 +50,11 @@ export function initEditor(render,status){
  });
 }
 export function drawEditor(ctx,dpi,width,height){
- const unit=dpi/25.4,fields=[];
+ const unit=dpi/25.4,fields=[];renderedEntries=[];
+ sequenceCount(elements);
  $('element-commands').textContent='';
- for(const e of elements){
+ for(const original of elements){
+  const e=original.type==='barcode'?{...original,text:barcodeContent(original,0)}:original;
   if(['text','barcode','qr','url'].includes(e.type)&&!e.text.trim())continue;
   if(!Number.isFinite(e.x+e.y)||e.x<0||e.y<0||e.x>200||e.y>300)throw new Error('La posición de los elementos debe estar entre 0 y 200 mm en X y 0 y 300 mm en Y.');
   if(e.type==='text'&&(!Number.isFinite(e.size)||e.size<1||e.size>50))throw new Error('Usa un tamaño de texto de 1 a 50 mm.');
@@ -78,7 +90,11 @@ export function drawEditor(ctx,dpi,width,height){
    const c=document.createElement('canvas');c.width=iw;c.height=ih;const ic=c.getContext('2d',{willReadFrequently:true});ic.drawImage(e.bitmap,0,0,iw,ih);
    const result=rasterToZpl(ic.getImageData(0,0,iw,ih).data,iw,ih,128,false,e.mode);ic.putImageData(new ImageData(result.preview,iw,ih),0,0);ctx.drawImage(c,x,y);command=graphicField(result.zpl,x,y);
   }
-  fields.push(command);if(e.id===selected)$('element-commands').textContent=command;
+  fields.push(command);renderedEntries.push({element:original,command});if(e.id===selected)$('element-commands').textContent=command;
+ }
+ const selectedElement=current();
+ if(selectedElement?.type==='barcode'&&selectedElement.numberMode==='sequence'){
+  const count=Number(selectedElement.sequenceCount);$('sequence-preview').textContent=`Primer código: ${barcodeContent(selectedElement,0)} · Último: ${barcodeContent(selectedElement,count-1)} · ${count} números distintos.`;
  }
  const label=nativeLabel(fields,width,height),images=elements.filter(e=>e.type==='image').length;
  if(!images&&label.includes('^GFA'))throw new Error('La etiqueta nativa no debe contener gráficos.');
@@ -92,3 +108,5 @@ export function useEditorFont(font){
  report('Fuente aplicada. Escribe o edita el contenido de tu texto.');
 }
 export function addEditorElement(type){if(type==='image')$('editor-image').click();else add(type);}
+
+export function editorPrintJob(width,height,dpi,copies,speed,media){return buildEditorJob(renderedEntries,width,height,dpi,copies,speed,media);}

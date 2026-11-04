@@ -1,4 +1,4 @@
-import qrcode from './vendor/qrcode.mjs?v=native-v3';
+import qrcode from './vendor/qrcode.mjs?v=native-v4';
 // Use the platform UTF-8 encoder, including accented text and emoji.
 qrcode.stringToBytes=text=>Array.from(new TextEncoder().encode(text));
 export function makeQr(text,isUrl=false){

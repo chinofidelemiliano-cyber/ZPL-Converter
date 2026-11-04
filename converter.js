@@ -29,6 +29,8 @@ export function rasterToZpl(rgba,width,height,threshold=128,invert=false,mode="t
 
 export function applyPrintSettings(zpl,copies=1,speed=''){
  if(!Number.isInteger(copies)||copies<1||copies>9999)throw new Error('La cantidad debe ser un entero entre 1 y 9999 etiquetas.');
- if(speed!==''&&(!Number.isInteger(speed)||speed<1||speed>14))throw new Error('La velocidad debe ser un entero entre 1 y 14 pulgadas por segundo.');
+ const validLetter=typeof speed==='string'&&/^[A-E]$/.test(speed);
+ if(typeof speed==='string'&&/^(?:[1-9]|1[0-4])$/.test(speed))speed=Number(speed);
+ if(speed!==''&&!validLetter&&(!Number.isInteger(speed)||speed<1||speed>14))throw new Error('Elige una velocidad numérica entre 1 y 14, o una letra heredada de A a E.');
  return zpl.replace('^XA\n','^XA\n'+(speed===''?'':`^PR${speed}\n`)).replace('\n^XZ',`\n^PQ${copies}\n^XZ`);
 }
