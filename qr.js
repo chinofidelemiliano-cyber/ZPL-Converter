@@ -1,14 +1,21 @@
-import qrcode from './vendor/qrcode.mjs?v=native-v4';
+import qrcode from './vendor/qrcode.mjs?v=native-v5';
 // Use the platform UTF-8 encoder, including accented text and emoji.
 qrcode.stringToBytes=text=>Array.from(new TextEncoder().encode(text));
-export function makeQr(text,isUrl=false){
- const content=text.trim();
+export function qrContent(text,isUrl=false){
+ let content=text.trim();
  if(!content)throw new Error('Escribe el contenido del código QR.');
- if(new TextEncoder().encode(content).length>1000)throw new Error('El QR admite hasta 1000 bytes. Acorta el texto o el enlace.');
  if(isUrl){
-  let url;try{url=new URL(content);}catch{throw new Error('Escribe un enlace completo, por ejemplo https://tusitio.com.');}
-  if(!['https:','http:'].includes(url.protocol)||!url.hostname)throw new Error('El enlace debe empezar con https:// o http://.');
+  if(!/^[a-z][a-z0-9+.-]*:/i.test(content)){
+   if(!/^(?:[a-z0-9-]+\.)+[a-z0-9-]+(?::\d+)?(?:[/?#]|$)/i.test(content))throw new Error('Escribe un enlace válido, por ejemplo tusitio.com o https://tusitio.com.');
+   content='https://'+content;
+  }
+  let url;try{url=new URL(content);}catch{throw new Error('Revisa el enlace de tu página web.');}
+  if(!['https:','http:'].includes(url.protocol)||!url.hostname||/\s/.test(content))throw new Error('El enlace debe ser una dirección web http:// o https:// sin espacios.');
  }
- const qr=qrcode(0,'M');qr.addData(content,'Byte');qr.make();
+ if(new TextEncoder().encode(content).length>1000)throw new Error('El QR admite hasta 1000 bytes. Acorta el texto o el enlace.');
+ return content;
+}
+export function makeQr(text,isUrl=false){
+ const content=qrContent(text,isUrl),qr=qrcode(0,'M');qr.addData(content,'Byte');qr.make();
  return {size:qr.getModuleCount(),dark:(row,col)=>qr.isDark(row,col)};
 }

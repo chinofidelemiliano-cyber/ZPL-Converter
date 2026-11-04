@@ -1,6 +1,6 @@
-import {fontCommand} from './fonts.js?v=native-v4';
-import {code39} from './barcode.js?v=native-v4';
-import {makeQr} from './qr.js?v=native-v4';
+import {fontCommand} from './fonts.js?v=native-v5';
+import {code39} from './barcode.js?v=native-v5';
+import {makeQr,qrContent} from './qr.js?v=native-v5';
 // Escape command delimiters and non-ASCII UTF-8 bytes in field content.
 export const fieldData=text=>Array.from(new TextEncoder().encode(text),b=>b>=32&&b<=126&&![94,126,92].includes(b)?String.fromCharCode(b):'\\'+b.toString(16).padStart(2,'0').toUpperCase()).join('');
 export function nativeElement(e,dpi,labelWidth,labelHeight){
@@ -31,7 +31,7 @@ export function nativeElement(e,dpi,labelWidth,labelHeight){
   if(module<2)throw new Error('Aumenta el tamaño del QR o reduce su contenido.');
   const total=(qr.size+8)*module;
   if(x+total>labelWidth||y+total>labelHeight)throw new Error('El QR debe caber completo dentro de la etiqueta.');
-  return `^FO${x+4*module},${y+4*module}\n^BQN,2,${module}\n^FH\\\n^FDMA,${fieldData(e.text.trim())}^FS`;
+  return `^FO${x+4*module},${y+4*module}\n^BQN,2,${module}\n^FH\\\n^FDMA,${fieldData(qrContent(e.text,e.type==='url'))}^FS`;
  }
  throw new Error('Tipo de elemento nativo desconocido.');
 }

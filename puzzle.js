@@ -1,5 +1,5 @@
-import {rasterToZpl,applyPrintSettings} from './converter.js?v=native-v4';
-import {applyMedia} from './media.js?v=native-v4';
+import {rasterToZpl,applyPrintSettings} from './converter.js?v=native-v5';
+import {applyMedia} from './media.js?v=native-v5';
 export function puzzleLayout(width,height,rows,cols){
  if(![width,height,rows,cols].every(Number.isInteger)||width<1||height<1||rows<1||rows>10||cols<1||cols>10)throw new Error('Usa de 1 a 10 filas y de 1 a 10 columnas.');
  if(width*height*rows*cols>16000000)throw new Error('El rompecabezas supera los 16 millones de puntos. Reduce filas, columnas, tamaño o resolución.');

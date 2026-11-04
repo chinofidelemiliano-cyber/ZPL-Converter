@@ -1,7 +1,7 @@
-import {barcodeContent,sequenceCount} from './sequence.js?v=native-v4';
-import {nativeElement,nativeLabel} from './native.js?v=native-v4';
-import {applyPrintSettings} from './converter.js?v=native-v4';
-import {applyMedia} from './media.js?v=native-v4';
+import {barcodeContent,sequenceCount} from './sequence.js?v=native-v5';
+import {nativeElement,nativeLabel} from './native.js?v=native-v5';
+import {applyPrintSettings} from './converter.js?v=native-v5';
+import {applyMedia} from './media.js?v=native-v5';
 export function buildEditorJob(entries,width,height,dpi,copies,speed,media){
  const count=sequenceCount(entries.map(entry=>entry.element));
  const jobs=[];let bytes=0;

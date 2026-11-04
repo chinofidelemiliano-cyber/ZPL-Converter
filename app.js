@@ -1,15 +1,16 @@
-import {rasterToZpl,applyPrintSettings} from './converter.js?v=native-v4';
-import {drawEditor,initEditor,useEditorFont,addEditorElement,editorPrintJob} from './editor.js?v=native-v4';
-import {initUnits,readMm,fromMm,unitLabel,writeMm} from './units.js?v=native-v4';
-import {mediaSettings,applyMedia} from './media.js?v=native-v4';
-import {buildPuzzle} from './puzzle.js?v=native-v4';
-import {initGallery} from './gallery.js?v=native-v4';
+import {rasterToZpl,applyPrintSettings} from './converter.js?v=native-v5';
+import {drawEditor,initEditor,useEditorFont,addEditorElement,editorPrintJob,editorHasContent,editorEmptyMessage} from './editor.js?v=native-v5';
+import {initUnits,readMm,fromMm,unitLabel,writeMm} from './units.js?v=native-v5';
+import {mediaSettings,applyMedia} from './media.js?v=native-v5';
+import {buildPuzzle} from './puzzle.js?v=native-v5';
+import {initGallery} from './gallery.js?v=native-v5';
 const $=id=>document.getElementById(id);
 let source=null,request=0,activeTab="image";
 initUnits(render);
 function status(message){$('status').textContent=message;}
 function clear(){ $('puzzle-summary').textContent='';$('series-job-info').textContent='';$('series-job-info').hidden=true;$('sequence-preview').textContent='';$('element-commands').textContent=''; $('code').value='';$('copy').disabled=$('download').disabled=true;$('preview').hidden=true;$('empty').hidden=false; }
 function render(){
+ $('editor-error').hidden=true;
  updateStock();
  $('thresholdValue').textContent=$('threshold').value;
  try{
@@ -21,6 +22,7 @@ function render(){
  const media=mediaSettings($('media').value,readMm('gap'),mmH,dpi);
  const copies=Number($('copies').value),speed=$('speed').value;
  if(!source&&activeTab!=='editor')return;
+ if(activeTab==='editor'&&!editorHasContent()){clear();$('empty').querySelector('p').textContent=editorEmptyMessage();status(editorEmptyMessage());return;}
  const canvas=$('preview');
  if(activeTab==='puzzle'){
   const rows=Number($('puzzle-rows').value),cols=Number($('puzzle-cols').value);
@@ -51,7 +53,7 @@ function render(){
  $('copies').previousElementSibling.textContent=job.hasSequence?'Copias de cada número · ^PQ':'Cantidad de etiquetas · ^PQ';$('preview').hidden=false;$('empty').hidden=true;
  $('copy').disabled=$('download').disabled=false;$('dimensions').textContent=`${w} × ${h} dots`;
  $('info').textContent=`${Number(fromMm(mmW,$('units').value).toFixed(4))} × ${Number(fromMm(mmH,$('units').value).toFixed(4))} ${unitLabel()} · ${dpi} dpi · ${job.total} etiqueta(s)`;status('Conversión lista. Puedes copiar o descargar el código.');
- }catch(error){clear();status(error.message);}
+ }catch(error){clear();$('empty').querySelector('p').textContent=error.message;if(activeTab==='editor'){$('editor-error').textContent=error.message;$('editor-error').hidden=false;}status(error.message);}
 }
 async function load(file){
  if(!file)return;
@@ -84,7 +86,7 @@ function switchTab(tab,navigate=true){
  if(tab==='gallery')return;
  activeTab=tab;
  $('image-tools').hidden=$('image-adjustments').hidden=!['image','puzzle'].includes(tab);$('editor-tools').hidden=tab!=='editor';$('puzzle-tools').hidden=tab!=='puzzle';
- if(tab==='editor')$('zpl-output').open=true;
+ $('print-settings').open=tab!=='editor';if(tab==='editor')$('zpl-output').open=false;
  $('preview-note').textContent=tab==='editor'?'Vista previa aproximada. Las fuentes, sus tamaños y los códigos nativos los interpreta la impresora.':'Vista previa del mapa de bits.';
  $('series-job-info').hidden=tab!=='editor';
  $('copies').previousElementSibling.textContent=tab==='puzzle'?'Copias por pieza · ^PQ':'Cantidad de etiquetas · ^PQ';
