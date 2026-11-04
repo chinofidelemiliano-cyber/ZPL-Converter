@@ -1,4 +1,4 @@
-import {makeQr} from './qr.js?v=native-v5';
+import {makeQr} from './qr.js?v=native-v6';
 export function guidedLayout(element,width,height,dpi){
  const e={...element},margin=Math.min(3,width/12,height/12),size=Number(e.captionSize||3);
  let caption=null,lines=[];
@@ -20,8 +20,8 @@ export function guidedLayout(element,width,height,dpi){
  }
  if(lines.length){
   const bottom=e.type==='text'?e.y+e.size*1.2*Math.max(1,e.text.split('\n').length):e.y+(['qr','url'].includes(e.type)?e.w:e.h);
-  caption={type:'text',id:-e.id,x:margin,y:bottom+2,size,font:'arial',bold:false,text:lines.join('\n')};
-  if(caption.y+lines.length*size*1.2>height-margin+1e-6)throw new Error('El texto adicional no cabe debajo del elemento. Activa el ajuste automático o aumenta el largo de la etiqueta.');
+  caption={type:'text',id:-e.id,x:e.captionManual?e.captionX:margin,y:e.captionManual?e.captionY:bottom+2,size,font:'arial',bold:false,text:lines.join('\n')};
+  if(!e.captionManual&&caption.y+lines.length*size*1.2>height-margin+1e-6)throw new Error('El texto adicional no cabe debajo del elemento. Activa el ajuste automático o aumenta el largo de la etiqueta.');
  }
  return {element:e,caption};
 }

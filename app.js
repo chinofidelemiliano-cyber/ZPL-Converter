@@ -1,15 +1,17 @@
-import {rasterToZpl,applyPrintSettings} from './converter.js?v=native-v5';
-import {drawEditor,initEditor,useEditorFont,addEditorElement,editorPrintJob,editorHasContent,editorEmptyMessage} from './editor.js?v=native-v5';
-import {initUnits,readMm,fromMm,unitLabel,writeMm} from './units.js?v=native-v5';
-import {mediaSettings,applyMedia} from './media.js?v=native-v5';
-import {buildPuzzle} from './puzzle.js?v=native-v5';
-import {initGallery} from './gallery.js?v=native-v5';
+import {rasterToZpl,applyPrintSettings} from './converter.js?v=native-v6';
+import {drawEditor,initEditor,useEditorFont,addEditorElement,editorPrintJob,editorHasContent,editorEmptyMessage,editorScene,selectEditorItem,moveEditorItem,commitEditorPosition} from './editor.js?v=native-v6';
+import {initUnits,readMm,fromMm,unitLabel,writeMm} from './units.js?v=native-v6';
+import {mediaSettings,applyMedia} from './media.js?v=native-v6';
+import {buildPuzzle} from './puzzle.js?v=native-v6';
+import {initGallery} from './gallery.js?v=native-v6';
+import {installFieldHelp} from './field-help.js?v=native-v6';
+import {initPositioning} from './positioning.js?v=native-v6';
 const $=id=>document.getElementById(id);
-let source=null,request=0,activeTab="image";
+let source=null,request=0,activeTab="image",positionController=null;
 initUnits(render);
 function status(message){$('status').textContent=message;}
 function clear(){ $('puzzle-summary').textContent='';$('series-job-info').textContent='';$('series-job-info').hidden=true;$('sequence-preview').textContent='';$('element-commands').textContent=''; $('code').value='';$('copy').disabled=$('download').disabled=true;$('preview').hidden=true;$('empty').hidden=false; }
-function render(){
+function render(options={}){
  $('editor-error').hidden=true;
  updateStock();
  $('thresholdValue').textContent=$('threshold').value;
@@ -48,12 +50,13 @@ function render(){
  }
  const zpl=activeTab==='editor'?nativeZpl:rasterToZpl(ctx.getImageData(0,0,w,h).data,w,h).zpl;
  if(typeof zpl!=='string')throw new Error('No se pudo generar ZPL nativo.');
+ if(options.interactive){$('preview').hidden=false;$('empty').hidden=true;$('copy').disabled=$('download').disabled=true;return;}
  const job=activeTab==='editor'?editorPrintJob(w,h,dpi,copies,speed,media.mode):{zpl:applyMedia(applyPrintSettings(zpl,copies,speed),media.mode),total:copies,hasSequence:false};
  $('code').value=job.zpl;$('series-job-info').hidden=!job.hasSequence;$('series-job-info').textContent=job.hasSequence?`${job.numbers} números distintos × ${copies} copias de cada uno = ${job.total} etiquetas. Se imprimen primero las copias de un número y luego el siguiente.`:'';
  $('copies').previousElementSibling.textContent=job.hasSequence?'Copias de cada número · ^PQ':'Cantidad de etiquetas · ^PQ';$('preview').hidden=false;$('empty').hidden=true;
  $('copy').disabled=$('download').disabled=false;$('dimensions').textContent=`${w} × ${h} dots`;
  $('info').textContent=`${Number(fromMm(mmW,$('units').value).toFixed(4))} × ${Number(fromMm(mmH,$('units').value).toFixed(4))} ${unitLabel()} · ${dpi} dpi · ${job.total} etiqueta(s)`;status('Conversión lista. Puedes copiar o descargar el código.');
- }catch(error){clear();$('empty').querySelector('p').textContent=error.message;if(activeTab==='editor'){$('editor-error').textContent=error.message;$('editor-error').hidden=false;}status(error.message);}
+ }catch(error){clear();$('empty').querySelector('p').textContent=error.message;if(activeTab==='editor'){$('editor-error').textContent=error.message;$('editor-error').hidden=false;}status(error.message);}finally{positionController?.refresh();}
 }
 async function load(file){
  if(!file)return;
@@ -75,6 +78,8 @@ for(const [id,measurement] of [['pw','width'],['ll','height']])$(id).addEventLis
  const dots=$(id).value===''?NaN:Number($(id).value);writeMm(measurement,Number.isInteger(dots)?dots*25.4/Number($('dpi').value):NaN);render();
 });
 initEditor(render,status);
+installFieldHelp();
+positionController=initPositioning({scene:editorScene,select:selectEditorItem,move:moveEditorItem,commit:commitEditorPosition});
 const routes={image:'/index.html',editor:'/editor.html',puzzle:'/rompecabezas.html',gallery:'/fuentes.html'};
 const sections={image:['Imagen a ZPL','Convierte tus imágenes a blanco y negro o grises con puntos.'],editor:['Crea tu etiqueta desde cero','Texto, QR, códigos de barras y recuadros con comandos ZPL nativos.'],puzzle:['Rompecabezas de etiquetas','Divide una imagen completa en piezas para imprimir y ensamblar.'],gallery:['Fuentes y muestrario','Explora fuentes residentes y elementos para tu impresora Zebra.']};
 function switchTab(tab,navigate=true){
@@ -82,6 +87,7 @@ function switchTab(tab,navigate=true){
  document.body.dataset.page=tab;document.title=sections[tab][0]+' · Label Studio';$('section-title').textContent=sections[tab][0];$('section-description').textContent=sections[tab][1];
 
  for(const t of ['image','editor','puzzle','gallery']){ $('tab-'+t).classList.toggle('active',t===tab);$('tab-'+t).setAttribute('aria-pressed',String(t===tab));if(t===tab)$('tab-'+t).setAttribute('aria-current','page');else $('tab-'+t).removeAttribute('aria-current'); }
+ $('positioning-tools').hidden=tab!=='editor';$('section-current').textContent=sections[tab][0];$('section-menu').open=false;
  $('gallery').hidden=tab!=='gallery';$('workspace').hidden=tab==='gallery';
  if(tab==='gallery')return;
  activeTab=tab;

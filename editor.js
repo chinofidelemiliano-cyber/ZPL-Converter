@@ -1,18 +1,19 @@
-import {nativeElement,graphicField,nativeLabel} from './native.js?v=native-v5';
-import {rasterToZpl} from './converter.js?v=native-v5';
-import {code39} from './barcode.js?v=native-v5';
-import {makeQr} from './qr.js?v=native-v5';
-import {readMm,writeMm,unitLabel} from './units.js?v=native-v5';
-import {fonts,fontById} from './fonts.js?v=native-v5';
-import {barcodeContent,sequenceCount} from './sequence.js?v=native-v5';
-import {buildEditorJob} from './jobs.js?v=native-v5';
-import {guidedLayout} from './guided.js?v=native-v5';
+import {nativeElement,graphicField,nativeLabel} from './native.js?v=native-v6';
+import {rasterToZpl} from './converter.js?v=native-v6';
+import {code39} from './barcode.js?v=native-v6';
+import {makeQr} from './qr.js?v=native-v6';
+import {readMm,writeMm,unitLabel} from './units.js?v=native-v6';
+import {fonts,fontById} from './fonts.js?v=native-v6';
+import {barcodeContent,sequenceCount} from './sequence.js?v=native-v6';
+import {buildEditorJob} from './jobs.js?v=native-v6';
+import {guidedLayout} from './guided.js?v=native-v6';
+import {clampPosition} from './positioning.js?v=native-v6';
 const $=id=>document.getElementById(id);
-const elements=[];let selected=null,redraw,report,nextId=1;let renderedEntries=[];let activeTool=null,freeLayout=false;const drafts=new Map();
+const elements=[];let selected=null,redraw,report,nextId=1;const imageRasters=new WeakMap();let renderedEntries=[],renderedScene=[],positionTarget=null;let activeTool=null,freeLayout=false;const drafts=new Map();
 function current(){return elements.find(e=>e.id===selected);}
 function updateList(){
  $('elements').replaceChildren();
- for(const e of elements){const button=document.createElement('button');button.textContent=({text:'Texto',box:'Recuadro',barcode:'Code 39',qr:'Código QR',url:'QR con enlace',image:'Imagen gráfica (^GFA)'})[e.type]+': '+(e.type==='barcode'&&e.numberMode==='sequence'?'Serie desde '+e.sequenceStart:(e.text||e.name||(e.type==='box'?'Borde':'Sin contenido')));button.classList.toggle('selected',e.id===selected);button.setAttribute('aria-pressed',String(e.id===selected));button.addEventListener('click',()=>{selected=e.id;updateList();properties();});$('elements').append(button);}
+ for(const e of elements){const button=document.createElement('button');button.textContent=({text:'Texto',box:'Recuadro',barcode:'Code 39',qr:'Código QR',url:'QR con enlace',image:'Imagen gráfica (^GFA)'})[e.type]+': '+(e.type==='barcode'&&e.numberMode==='sequence'?'Serie desde '+e.sequenceStart:(e.text||e.name||(e.type==='box'?'Borde':'Sin contenido')));button.classList.toggle('selected',e.id===selected);button.setAttribute('aria-pressed',String(e.id===selected));button.addEventListener('click',()=>{selected=e.id;positionTarget=e.id;updateList();properties();});$('elements').append(button);}
 }
 function properties(){
  const e=current();$('properties').hidden=!e;updateFocusedUi();if(!e)return;
@@ -24,6 +25,7 @@ function properties(){
  $('sequence-options').hidden=e.numberMode!=='sequence';$('text-properties').hidden=e.type!=='text';$('size-properties').hidden=e.type==='text';$('box-properties').hidden=e.type!=='box';$('editor-image-properties').hidden=e.type!=='image';
  for(const [id,key] of Object.entries({'element-text':'text','element-x':'x','element-y':'y','element-w':'w','element-h':'h','font-size':'size','line-width':'line','element-mode':'mode'})){if(['x','y','w','h','size','line'].includes(key))writeMm(id,e[key]);else $(id).value=e[key]??'';}
  $('fo-x').value=Math.round(e.x*Number($('dpi').value)/25.4);$('fo-y').value=Math.round(e.y*Number($('dpi').value)/25.4);
+ const targetPosition=renderedScene.find(item=>item.id===positionTarget);if(positionTarget<0&&targetPosition){const unit=Number($('dpi').value)/25.4;writeMm('element-x',targetPosition.x/unit);writeMm('element-y',targetPosition.y/unit);$('fo-x').value=Math.round(targetPosition.x);$('fo-y').value=Math.round(targetPosition.y);}
  $('bold').checked=!!e.bold;$('italic').checked=!!e.italic;$('font-family').value=e.font||'arial';$('font-file').value=e.fontFile||'';$('font-file-card').hidden=!fontById(e.font).requiresFile;
  $('element-text').previousElementSibling.textContent=e.type==='url'?'Enlace de tu página web':e.type==='qr'?'Contenido del código QR':'Contenido';
  $('element-text').placeholder=e.type==='url'?'https://tusitio.com':e.type==='barcode'?'Escribe tu código, por ejemplo PRODUCTO123':'Escribe tu contenido';
@@ -31,7 +33,7 @@ function properties(){
  $('element-h').closest('.field').hidden=['qr','url'].includes(e.type);
  document.querySelector('label[for=element-w]').textContent=['qr','url'].includes(e.type)?`Tamaño del QR`:`Ancho`;
 }
-function add(type,extra={}){const e={id:nextId++,type,x:5,y:5,w:40,h:15,size:5,line:.4,bold:false,italic:false,font:'arial',fontFile:'',numberMode:'fixed',sequenceStart:'1',sequenceStep:'1',sequenceCount:10,sequencePad:4,sequencePrefix:'',sequenceSuffix:'',mode:'threshold',text:'',autoLayout:!freeLayout,captionEnabled:false,captionText:'',captionSize:3,...(['qr','url'].includes(type)?{w:25,h:25}:{}),...extra};elements.push(e);selected=e.id;updateList();properties();redraw();if(['text','barcode','qr','url'].includes(type))report(type==='url'?'Escribe el enlace web de tu QR en el campo Contenido.':'Escribe el contenido del elemento en el campo Contenido.');}
+function add(type,extra={}){const e={id:nextId++,type,x:5,y:5,w:40,h:15,size:5,line:.4,bold:false,italic:false,font:'arial',fontFile:'',numberMode:'fixed',sequenceStart:'1',sequenceStep:'1',sequenceCount:10,sequencePad:4,sequencePrefix:'',sequenceSuffix:'',mode:'threshold',text:'',autoLayout:!freeLayout,captionEnabled:false,captionText:'',captionSize:3,...(['qr','url'].includes(type)?{w:25,h:25}:{}),...extra};elements.push(e);selected=e.id;positionTarget=e.id;updateList();properties();redraw();if(['text','barcode','qr','url'].includes(type))report(type==='url'?'Escribe el enlace web de tu QR en el campo Contenido.':'Escribe el contenido del elemento en el campo Contenido.');}
 export function initEditor(render,status){
  redraw=render;report=status;
  const settings=document.querySelector('.settings'),container=document.createElement('details');container.id='print-settings';container.open=true;
@@ -42,6 +44,7 @@ export function initEditor(render,status){
  $('free-layout').addEventListener('change',()=>{freeLayout=$('free-layout').checked;updateFocusedUi();properties();redraw();});
  for(const [id,key] of [['companion-enabled','captionEnabled'],['companion-text','captionText'],['companion-size','captionSize'],['auto-fit-element','autoLayout']])$(id).addEventListener('input',()=>{
   const e=current();if(!e)return;e[key]=id==='companion-enabled'||id==='auto-fit-element'?$(id).checked:id==='companion-size'?readMm(id):$(id).value;
+  if(id==='auto-fit-element'&&e.autoLayout)e.captionManual=false;
   $('companion-fields').hidden=!e.captionEnabled;redraw();
  });
  for(const [id,key] of Object.entries({'barcode-number-mode':'numberMode','sequence-start':'sequenceStart','sequence-step':'sequenceStep','sequence-count':'sequenceCount','sequence-pad':'sequencePad','sequence-prefix':'sequencePrefix','sequence-suffix':'sequenceSuffix'}))$(id).addEventListener('input',()=>{
@@ -51,11 +54,11 @@ export function initEditor(render,status){
  });
  $('new-label').addEventListener('click',()=>{for(const e of elements)e.bitmap?.close();elements.length=0;selected=null;if(activeTool)drafts.set(activeTool,[]);updateList();properties();redraw();report('Etiqueta nueva. Añade texto, códigos o recuadros: se exportarán como ZPL nativo.');});
  for(const [id,key,target] of [['fo-x','x','element-x'],['fo-y','y','element-y']])$(id).addEventListener('input',()=>{
-  const e=current();if(!e)return;const dots=$(id).value===''?NaN:Number($(id).value);e[key]=Number.isInteger(dots)?dots*25.4/Number($('dpi').value):NaN;e.autoLayout=false;$('auto-fit-element').checked=false;writeMm(target,e[key]);redraw();
+  const e=current();if(!e)return;const dots=$(id).value===''?NaN:Number($(id).value);if(positionTarget<0){const item=renderedScene.find(entry=>entry.id===positionTarget);if(item){moveEditorItem(positionTarget,key==='x'?dots:item.x,key==='y'?dots:item.y);return;}}e[key]=Number.isInteger(dots)?dots*25.4/Number($('dpi').value):NaN;e.autoLayout=false;$('auto-fit-element').checked=false;writeMm(target,e[key]);redraw();
  });
  for(const font of fonts){const option=document.createElement('option');option.value=font.id;option.textContent=font.name;$('font-family').append(option);}
  for(const type of ['text','box','barcode','qr','url'])$('add-'+type).addEventListener('click',()=>chooseType(type));
- for(const [id,key] of Object.entries({'element-text':'text','element-x':'x','element-y':'y','element-w':'w','element-h':'h','font-size':'size','line-width':'line','element-mode':'mode','bold':'bold','italic':'italic','font-family':'font','font-file':'fontFile'}))$(id).addEventListener('input',()=>{const e=current();if(!e)return;if(['x','y','w','h'].includes(key)){e.autoLayout=false;$('auto-fit-element').checked=false;}e[key]=['bold','italic'].includes(id)?$(id).checked:['text','mode','font','fontFile'].includes(key)?$(id).value:readMm(id);updateList();if(key==='font')$('font-file-card').hidden=!fontById(e.font).requiresFile;if(['x','y'].includes(key))$('fo-'+key).value=Math.round(e[key]*Number($('dpi').value)/25.4);redraw();});
+ for(const [id,key] of Object.entries({'element-text':'text','element-x':'x','element-y':'y','element-w':'w','element-h':'h','font-size':'size','line-width':'line','element-mode':'mode','bold':'bold','italic':'italic','font-family':'font','font-file':'fontFile'}))$(id).addEventListener('input',()=>{const e=current();if(!e)return;if(positionTarget<0&&['x','y'].includes(key)){const item=renderedScene.find(entry=>entry.id===positionTarget);if(item){const dots=readMm(id)*Number($('dpi').value)/25.4;moveEditorItem(positionTarget,key==='x'?dots:item.x,key==='y'?dots:item.y);return;}}if(['x','y','w','h'].includes(key)){e.autoLayout=false;$('auto-fit-element').checked=false;}e[key]=['bold','italic'].includes(id)?$(id).checked:['text','mode','font','fontFile'].includes(key)?$(id).value:readMm(id);updateList();if(key==='font')$('font-file-card').hidden=!fontById(e.font).requiresFile;if(['x','y'].includes(key))$('fo-'+key).value=Math.round(e[key]*Number($('dpi').value)/25.4);redraw();});
  $('delete-element').addEventListener('click',()=>{const e=current();if(!e)return;e.bitmap?.close();elements.splice(elements.indexOf(e),1);selected=elements.at(-1)?.id??null;updateList();properties();redraw();});
  $('editor-image').addEventListener('click',()=>{if(!freeLayout)activateDraft('image');});
  $('editor-image').addEventListener('change',async event=>{
@@ -65,7 +68,7 @@ export function initEditor(render,status){
  });
 }
 export function drawEditor(ctx,dpi,width,height){
- const unit=dpi/25.4,fields=[];renderedEntries=[];
+ const unit=dpi/25.4,fields=[];renderedEntries=[];renderedScene=[];
  const working=[];
  for(const original of elements){
   const result=guidedLayout(original,width/unit,height/unit,dpi);Object.assign(original,result.element);working.push(original);
@@ -83,7 +86,7 @@ export function drawEditor(ctx,dpi,width,height){
   if(e.type==='text'&&(!Number.isFinite(e.size)||e.size<1||e.size>50))throw new Error('Usa un tamaño de texto de 1 a 50 mm.');
   if(e.type!=='text'&&(!Number.isFinite(e.w+e.h)||e.w<1||e.w>200||e.h<1||e.h>300))throw new Error('El elemento debe medir entre 1 y 200 mm de ancho y entre 1 y 300 mm de alto.');
   const x=Math.round(e.x*unit),y=Math.round(e.y*unit),w=Math.round(e.w*unit),h=Math.round(e.h*unit);
-  if(e.id===selected){$('fo-x').value=x;$('fo-y').value=y;}
+  if(e.id===(positionTarget??selected)){$('fo-x').value=x;$('fo-y').value=y;if(e.id<0){writeMm('element-x',e.x);writeMm('element-y',e.y);}}
   let command=e.type==='image'?'':nativeElement(e,dpi,width,height);
   ctx.fillStyle='black';ctx.strokeStyle='black';
   if(e.type==='text'){
@@ -110,10 +113,19 @@ export function drawEditor(ctx,dpi,width,height){
   }else if(e.type==='image'){
    const scale=Math.min(w/e.bitmap.width,h/e.bitmap.height);const iw=Math.max(1,Math.round(e.bitmap.width*scale)),ih=Math.max(1,Math.round(e.bitmap.height*scale));
    if(iw*ih>16000000)throw new Error('Reduce el tamaño de la imagen.');
-   const c=document.createElement('canvas');c.width=iw;c.height=ih;const ic=c.getContext('2d',{willReadFrequently:true});ic.drawImage(e.bitmap,0,0,iw,ih);
-   const result=rasterToZpl(ic.getImageData(0,0,iw,ih).data,iw,ih,128,false,e.mode);ic.putImageData(new ImageData(result.preview,iw,ih),0,0);ctx.drawImage(c,x,y);command=graphicField(result.zpl,x,y);
+   let cached=imageRasters.get(original);const key=iw+':'+ih+':'+e.mode;
+   if(!cached||cached.key!==key||cached.bitmap!==e.bitmap){
+    const c=document.createElement('canvas');c.width=iw;c.height=ih;const ic=c.getContext('2d',{willReadFrequently:true});ic.drawImage(e.bitmap,0,0,iw,ih);
+    const result=rasterToZpl(ic.getImageData(0,0,iw,ih).data,iw,ih,128,false,e.mode);ic.putImageData(new ImageData(result.preview,iw,ih),0,0);cached={key,bitmap:e.bitmap,canvas:c,zpl:result.zpl};imageRasters.set(original,cached);
+   }
+   ctx.drawImage(cached.canvas,x,y);command=graphicField(cached.zpl,x,y);
   }
-  fields.push(command);renderedEntries.push({element:original,command});if(e.id===selected)$('element-commands').textContent=command;
+  let bw=w,bh=h;
+  if(e.type==='text'){bw=Math.max(1,...e.text.split('\n').map(line=>ctx.measureText(line).width));bh=Math.max(1,Math.round(e.size*unit)*1.2*e.text.split('\n').length);}
+  if(['qr','url'].includes(e.type)){const count=makeQr(e.text,e.type==='url').size;bw=bh=(count+8)*Math.min(10,Math.floor(w/(count+8)));}
+  if(e.type==='image'){const scale=Math.min(w/e.bitmap.width,h/e.bitmap.height);bw=Math.max(1,Math.round(e.bitmap.width*scale));bh=Math.max(1,Math.round(e.bitmap.height*scale));}
+  renderedScene.push({id:e.id,label:e.id<0?'Texto adicional':({text:'Texto',qr:'Código QR',url:'QR con enlace',barcode:'Código de barras',box:'Recuadro',image:'Imagen'})[e.type],x,y,width:bw,height:bh});
+  fields.push(command);renderedEntries.push({element:original,command});if(e.id===(positionTarget??selected))$('element-commands').textContent=command;
  }
  const selectedElement=current();
  if(selectedElement?.type==='barcode'&&selectedElement.numberMode==='sequence'){
@@ -153,3 +165,20 @@ function chooseType(type){
 }
 export function editorHasContent(){return elements.some(e=>e.type==='image'||e.type==='box'||(e.type==='barcode'&&e.numberMode==='sequence')||!!e.text?.trim());}
 export function editorEmptyMessage(){return activeTool==='url'?'Escribe el enlace para ver tu código QR.':activeTool?'Escribe el contenido para generar la vista previa.':'Elige el tipo de etiqueta para empezar.';}
+
+export function editorScene(){return {items:renderedScene,width:$('preview').width,height:$('preview').height,selected:positionTarget??selected};}
+export function selectEditorItem(id){
+ const real=elements.find(e=>e.id===Math.abs(id));if(!real)return;selected=real.id;positionTarget=id;updateList();properties();
+}
+export function moveEditorItem(id,x,y,interactive=false){
+ const item=renderedScene.find(entry=>entry.id===id),e=elements.find(element=>element.id===Math.abs(id));if(!item||!e)return;
+ const position=clampPosition(x,y,item,{width:$('preview').width,height:$('preview').height}),unit=Number($('dpi').value)/25.4;
+ if(id<0){e.captionManual=true;e.captionX=Math.round(position.x)/unit;e.captionY=Math.round(position.y)/unit;writeMm('element-x',e.captionX);writeMm('element-y',e.captionY);$('fo-x').value=Math.round(position.x);$('fo-y').value=Math.round(position.y);}
+ else{
+  const caption=renderedScene.find(entry=>entry.id===-id);if(caption&&!e.captionManual){e.captionManual=true;e.captionX=caption.x/unit;e.captionY=caption.y/unit;}
+  e.autoLayout=false;e.x=Math.round(position.x)/unit;e.y=Math.round(position.y)/unit;$('auto-fit-element').checked=false;
+  writeMm('element-x',e.x);writeMm('element-y',e.y);$('fo-x').value=Math.round(position.x);$('fo-y').value=Math.round(position.y);
+ }
+ positionTarget=id;redraw({interactive});
+}
+export function commitEditorPosition(){redraw();}

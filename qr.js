@@ -1,4 +1,4 @@
-import qrcode from './vendor/qrcode.mjs?v=native-v5';
+import qrcode from './vendor/qrcode.mjs?v=native-v6';
 // Use the platform UTF-8 encoder, including accented text and emoji.
 qrcode.stringToBytes=text=>Array.from(new TextEncoder().encode(text));
 export function qrContent(text,isUrl=false){
@@ -15,7 +15,9 @@ export function qrContent(text,isUrl=false){
  if(new TextEncoder().encode(content).length>1000)throw new Error('El QR admite hasta 1000 bytes. Acorta el texto o el enlace.');
  return content;
 }
+const cache=new Map();
 export function makeQr(text,isUrl=false){
- const content=qrContent(text,isUrl),qr=qrcode(0,'M');qr.addData(content,'Byte');qr.make();
- return {size:qr.getModuleCount(),dark:(row,col)=>qr.isDark(row,col)};
+ const content=qrContent(text,isUrl);if(cache.has(content))return cache.get(content);
+ const qr=qrcode(0,'M');qr.addData(content,'Byte');qr.make();
+ const result={size:qr.getModuleCount(),dark:(row,col)=>qr.isDark(row,col)};cache.set(content,result);if(cache.size>8)cache.delete(cache.keys().next().value);return result;
 }
