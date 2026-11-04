@@ -8,7 +8,7 @@ export function initGallery(useFont,addElement){
   const title=document.createElement('h3');title.textContent=font.name;
   const sample=document.createElement('p');sample.className='font-sample';sample.style.fontFamily=font.family;sample.textContent='Mi etiqueta · Café 123';
   const styles=document.createElement('p');styles.className='font-styles';styles.style.fontFamily=font.family;
-  const bold=document.createElement('strong');bold.textContent='Negrita';const italic=document.createElement('em');italic.textContent='Cursiva';styles.append(bold,italic);
+  const bold=document.createElement('strong');bold.textContent='Negrita';const command=document.createElement('code');command.textContent='^A'+font.zpl;styles.append(bold,command);
   const description=document.createElement('p');description.className='hint';description.textContent=font.description;
   const button=document.createElement('button');button.textContent='Usar esta fuente';button.addEventListener('click',()=>useFont(font.id));
   card.append(title,sample,styles,description,button);grid.append(card);
