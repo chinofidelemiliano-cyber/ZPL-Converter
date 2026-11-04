@@ -1,4 +1,4 @@
-import {makeQr} from './qr.js?v=native-v9';
+import {makeQr} from './qr.js?v=native-v10';
 export function guidedLayout(element,width,height,dpi){
  const e={...element},margin=Math.min(3,width/12,height/12),size=Number(e.captionSize||3);
  let caption=null,lines=[];

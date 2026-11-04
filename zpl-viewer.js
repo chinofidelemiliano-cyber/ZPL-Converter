@@ -1,5 +1,5 @@
-import {parseZpl} from './zpl-parser.js?v=native-v9';
-import {renderZplLabel} from './zpl-renderer.js?v=native-v9';
+import {parseZpl} from './zpl-parser.js?v=native-v10';
+import {renderZplLabel} from './zpl-renderer.js?v=native-v10';
 export const zplExamples={
  text:'^XA\n^PW800\n^LL400\n^CI28\n^FO40,40\n^A0N,45,27\n^FDMi etiqueta de ejemplo^FS\n^FO40,110\n^GB720,240,3^FS\n^FO80,150\n^BQN,2,5\n^FDMA,https://example.com^FS\n^XZ',
  barcode:'^XA\n^PW800\n^LL400\n^FO40,35^A0N,35,21^FDProducto 123456^FS\n^FO40,110^BY3,3,130^BCN,130,Y,N^FD123456^FS\n^XZ',

@@ -1,15 +1,16 @@
-import {rasterToZpl,applyPrintSettings} from './converter.js?v=native-v9';
-import {drawEditor,initEditor,useEditorFont,addEditorElement,editorPrintJob,editorHasContent,editorEmptyMessage,editorScene,selectEditorItem,moveEditorItem,commitEditorPosition} from './editor.js?v=native-v9';
-import {initUnits,readMm,fromMm,unitLabel,writeMm} from './units.js?v=native-v9';
-import {mediaSettings,applyMedia} from './media.js?v=native-v9';
-import {buildPuzzle} from './puzzle.js?v=native-v9';
-import {initGallery} from './gallery.js?v=native-v9';
-import {installFieldHelp} from './field-help.js?v=native-v9';
-import {initPositioning} from './positioning.js?v=native-v9';
-import {currentPrinter,initPrinterCatalog} from './printer-ui.js?v=native-v9';
-import {validatePrinter} from './printers.js?v=native-v9';
-import {initZplViewer} from './zpl-viewer.js?v=native-v9';
-import {initImageCrop} from './crop.js?v=native-v9';
+import {rasterToZpl,applyPrintSettings} from './converter.js?v=native-v10';
+import {drawEditor,initEditor,useEditorFont,addEditorElement,editorPrintJob,editorHasContent,editorEmptyMessage,editorScene,selectEditorItem,moveEditorItem,commitEditorPosition} from './editor.js?v=native-v10';
+import {initUnits,readMm,fromMm,unitLabel,writeMm} from './units.js?v=native-v10';
+import {mediaSettings,applyMedia} from './media.js?v=native-v10';
+import {buildPuzzle} from './puzzle.js?v=native-v10';
+import {initGallery} from './gallery.js?v=native-v10';
+import {installFieldHelp} from './field-help.js?v=native-v10';
+import {initPositioning} from './positioning.js?v=native-v10';
+import {currentPrinter,initPrinterCatalog} from './printer-ui.js?v=native-v10';
+import {validatePrinter} from './printers.js?v=native-v10';
+import {initZplViewer} from './zpl-viewer.js?v=native-v10';
+import {initImageCrop} from './crop.js?v=native-v10';
+import {initPreferences} from './preferences.js?v=native-v10';
 const $=id=>document.getElementById(id);
 let source=null,request=0,activeTab="image",positionController=null,cropController=null;
 initUnits(render);
@@ -91,18 +92,18 @@ cropController=initImageCrop({onChange:()=>render(),onBusy:()=>{$('copy').disabl
 initEditor(render,status);
 installFieldHelp();
 positionController=initPositioning({scene:editorScene,select:selectEditorItem,move:moveEditorItem,commit:commitEditorPosition});
-initPrinterCatalog(render);initZplViewer();
-const routes={models:'/impresoras.html',viewer:'/visor-zpl.html',image:'/index.html',editor:'/editor.html',puzzle:'/rompecabezas.html',gallery:'/fuentes.html'};
-const sections={models:['Modelos Zebra','Busca tu impresora y configura sus opciones de referencia.'],viewer:['Previsualizar código ZPL','Pega un código y convierte sus campos en una imagen de etiqueta.'],image:['Imagen a ZPL','Convierte tus imágenes a blanco y negro o grises con puntos.'],editor:['Crea tu etiqueta desde cero','Texto, QR, códigos de barras y recuadros con comandos ZPL nativos.'],puzzle:['Rompecabezas de etiquetas','Divide una imagen completa en piezas para imprimir y ensamblar.'],gallery:['Fuentes y muestrario','Explora fuentes residentes y elementos para tu impresora Zebra.']};
+initPrinterCatalog(render);initZplViewer();initPreferences();
+const routes={preferences:'/configuracion.html',models:'/impresoras.html',viewer:'/visor-zpl.html',image:'/index.html',editor:'/editor.html',puzzle:'/rompecabezas.html',gallery:'/fuentes.html'};
+const sections={preferences:['Configuración de página','Elige colores, tema y comodidad de lectura para tu navegador.'],models:['Modelos Zebra','Busca tu impresora y configura sus opciones de referencia.'],viewer:['Previsualizar código ZPL','Pega un código y convierte sus campos en una imagen de etiqueta.'],image:['Imagen a ZPL','Convierte tus imágenes a blanco y negro o grises con puntos.'],editor:['Crea tu etiqueta desde cero','Texto, QR, códigos de barras y recuadros con comandos ZPL nativos.'],puzzle:['Rompecabezas de etiquetas','Divide una imagen completa en piezas para imprimir y ensamblar.'],gallery:['Fuentes y muestrario','Explora fuentes residentes y elementos para tu impresora Zebra.']};
 function switchTab(tab,navigate=true){
  if(navigate&&location.pathname!==routes[tab])history.pushState({section:tab},'',routes[tab]);
  document.body.dataset.page=tab;document.title=sections[tab][0]+' · Label Studio';$('section-title').textContent=sections[tab][0];$('section-description').textContent=sections[tab][1];
 
- for(const t of ['image','editor','puzzle','gallery','models','viewer']){ $('tab-'+t).classList.toggle('active',t===tab);$('tab-'+t).setAttribute('aria-pressed',String(t===tab));if(t===tab)$('tab-'+t).setAttribute('aria-current','page');else $('tab-'+t).removeAttribute('aria-current'); }
+ for(const t of ['image','editor','puzzle','gallery','models','viewer','preferences']){ $('tab-'+t).classList.toggle('active',t===tab);$('tab-'+t).setAttribute('aria-pressed',String(t===tab));if(t===tab)$('tab-'+t).setAttribute('aria-current','page');else $('tab-'+t).removeAttribute('aria-current'); }
  $('positioning-tools').hidden=tab!=='editor';$('section-current').textContent=sections[tab][0];$('section-menu').open=false;
  activeTab=tab;
- $('gallery').hidden=tab!=='gallery';$('models').hidden=tab!=='models';$('viewer').hidden=tab!=='viewer';$('workspace').hidden=['gallery','models','viewer'].includes(tab);
- if(['gallery','models','viewer'].includes(tab)){positionController?.refresh();return;}
+ $('gallery').hidden=tab!=='gallery';$('models').hidden=tab!=='models';$('viewer').hidden=tab!=='viewer';$('preferences').hidden=tab!=='preferences';$('workspace').hidden=['gallery','models','viewer','preferences'].includes(tab);
+ if(['gallery','models','viewer','preferences'].includes(tab)){positionController?.refresh();return;}
  $('image-tools').hidden=$('image-adjustments').hidden=!['image','puzzle'].includes(tab);$('editor-tools').hidden=tab!=='editor';$('puzzle-tools').hidden=tab!=='puzzle';
  $('image-area-controls').hidden=tab!=='image';
  $('print-settings').open=tab!=='editor';if(tab==='editor')$('zpl-output').open=false;
@@ -111,7 +112,7 @@ function switchTab(tab,navigate=true){
  $('copies').previousElementSibling.textContent=tab==='puzzle'?'Copias por pieza · ^PQ':'Cantidad de etiquetas · ^PQ';
  clear();render();if(tab!=='editor'&&!source)status('Carga una imagen para empezar.');
 }
-for(const tab of ['image','editor','puzzle','gallery','models','viewer'])$('tab-'+tab).addEventListener('click',event=>{if(event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;event.preventDefault();switchTab(tab);});
+for(const tab of ['image','editor','puzzle','gallery','models','viewer','preferences'])$('tab-'+tab).addEventListener('click',event=>{if(event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;event.preventDefault();switchTab(tab);});
 addEventListener('popstate',()=>switchTab(Object.keys(routes).find(key=>routes[key].replace('.html','')===location.pathname.replace('.html',''))||'image',false));
 switchTab(document.body.dataset.page||'image',false);
 initGallery(font=>{switchTab('editor');useEditorFont(font);},type=>{switchTab('editor');addEditorElement(type);});
