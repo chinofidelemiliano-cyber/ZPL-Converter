@@ -1,22 +1,27 @@
 import {rasterToZpl} from './converter.js';
 import {code39} from './barcode.js';
+import {makeQr} from './qr.js';
 const $=id=>document.getElementById(id);
 const elements=[];let selected=null,redraw,report,nextId=1;
 function current(){return elements.find(e=>e.id===selected);}
 function updateList(){
  $('elements').replaceChildren();
- for(const e of elements){const button=document.createElement('button');button.textContent=({text:'Texto',box:'Recuadro',barcode:'Code 39',image:'Imagen'})[e.type]+': '+(e.text||e.name||'Borde');button.classList.toggle('selected',e.id===selected);button.setAttribute('aria-pressed',String(e.id===selected));button.addEventListener('click',()=>{selected=e.id;updateList();properties();});$('elements').append(button);}
+ for(const e of elements){const button=document.createElement('button');button.textContent=({text:'Texto',box:'Recuadro',barcode:'Code 39',qr:'Código QR',url:'QR con enlace',image:'Imagen'})[e.type]+': '+(e.text||e.name||(e.type==='box'?'Borde':'Sin contenido'));button.classList.toggle('selected',e.id===selected);button.setAttribute('aria-pressed',String(e.id===selected));button.addEventListener('click',()=>{selected=e.id;updateList();properties();});$('elements').append(button);}
 }
 function properties(){
  const e=current();$('properties').hidden=!e;if(!e)return;
- $('content-field').hidden=!['text','barcode'].includes(e.type);$('text-properties').hidden=e.type!=='text';$('size-properties').hidden=e.type==='text';$('box-properties').hidden=e.type!=='box';$('editor-image-properties').hidden=e.type!=='image';
+ $('content-field').hidden=!['text','barcode','qr','url'].includes(e.type);$('text-properties').hidden=e.type!=='text';$('size-properties').hidden=e.type==='text';$('box-properties').hidden=e.type!=='box';$('editor-image-properties').hidden=e.type!=='image';
  for(const [id,key] of Object.entries({'element-text':'text','element-x':'x','element-y':'y','element-w':'w','element-h':'h','font-size':'size','line-width':'line','element-mode':'mode'}))$(id).value=e[key]??'';
  $('bold').checked=!!e.bold;
+ $('element-text').placeholder=e.type==='url'?'https://tusitio.com':e.type==='barcode'?'Escribe tu código, por ejemplo PRODUCTO123':'Escribe tu contenido';
+ $('content-help').textContent=e.type==='url'?'El QR abrirá este enlace al escanearlo.':e.type==='barcode'?'Code 39: mayúsculas A–Z, números y - . $ / + %.':e.type==='qr'?'Texto, números o información para escanear.':'Admite varias líneas y acentos.';
+ $('element-h').closest('.field').hidden=['qr','url'].includes(e.type);
+ $('element-w').previousElementSibling.textContent=['qr','url'].includes(e.type)?'Tamaño del QR (mm)':'Ancho (mm)';
 }
-function add(type,extra={}){const e={id:nextId++,type,x:5,y:5,w:40,h:15,size:5,line:.4,bold:false,mode:'threshold',text:type==='barcode'?'ABC123':type==='text'?'Mi etiqueta':'',...extra};elements.push(e);selected=e.id;updateList();properties();redraw();}
+function add(type,extra={}){const e={id:nextId++,type,x:5,y:5,w:40,h:15,size:5,line:.4,bold:false,mode:'threshold',text:'',...(['qr','url'].includes(type)?{w:25,h:25}:{}),...extra};elements.push(e);selected=e.id;updateList();properties();redraw();if(['text','barcode','qr','url'].includes(type))report(type==='url'?'Escribe el enlace web de tu QR en el campo Contenido.':'Escribe el contenido del elemento en el campo Contenido.');}
 export function initEditor(render,status){
  redraw=render;report=status;
- for(const type of ['text','box','barcode'])$('add-'+type).addEventListener('click',()=>add(type));
+ for(const type of ['text','box','barcode','qr','url'])$('add-'+type).addEventListener('click',()=>add(type));
  for(const [id,key] of Object.entries({'element-text':'text','element-x':'x','element-y':'y','element-w':'w','element-h':'h','font-size':'size','line-width':'line','element-mode':'mode','bold':'bold'}))$(id).addEventListener('input',()=>{const e=current();if(!e)return;e[key]=id==='bold'?$(id).checked:['text','mode'].includes(key)?$(id).value:Number($(id).value);updateList();redraw();});
  $('delete-element').addEventListener('click',()=>{const e=current();if(!e)return;e.bitmap?.close();elements.splice(elements.indexOf(e),1);selected=elements.at(-1)?.id??null;updateList();properties();redraw();});
  $('editor-image').addEventListener('change',async event=>{
@@ -28,6 +33,7 @@ export function initEditor(render,status){
 export function drawEditor(ctx,dpi,width,height){
  const unit=dpi/25.4;
  for(const e of elements){
+  if(['text','barcode','qr','url'].includes(e.type)&&!e.text.trim())continue;
   if(!Number.isFinite(e.x+e.y)||e.x<0||e.y<0||e.x>200||e.y>300)throw new Error('La posición de los elementos debe estar entre 0 y 200 mm en X y 0 y 300 mm en Y.');
   if(e.type==='text'&&(!Number.isFinite(e.size)||e.size<1||e.size>50))throw new Error('Usa un tamaño de texto de 1 a 50 mm.');
   if(e.type!=='text'&&(!Number.isFinite(e.w+e.h)||e.w<1||e.w>200||e.h<1||e.h>300))throw new Error('El elemento debe medir entre 1 y 200 mm de ancho y entre 1 y 300 mm de alto.');
@@ -47,6 +53,13 @@ export function drawEditor(ctx,dpi,width,height){
    ctx.fillStyle='white';ctx.fillRect(x,y,w,h);ctx.fillStyle='black';
    for(const bar of code.bars)ctx.fillRect(x+bar.x*module,y,bar.width*module,barHeight);
    ctx.font=`${caption}px monospace`;ctx.textBaseline='top';ctx.fillText(e.text,x+10*module,y+barHeight+3,w-20*module);
+  }else if(e.type==='qr'||e.type==='url'){
+   const qr=makeQr(e.text,e.type==='url'),module=Math.floor(w/(qr.size+8));
+   if(module<2)throw new Error('El QR es demasiado pequeño para este contenido. Aumenta su tamaño o acorta el texto.');
+   const total=(qr.size+8)*module;
+   if(x+total>width||y+total>height)throw new Error('El QR debe caber completo dentro de la etiqueta, incluidos sus márgenes blancos.');
+   ctx.fillStyle='white';ctx.fillRect(x,y,total,total);ctx.fillStyle='black';
+   for(let row=0;row<qr.size;row++)for(let col=0;col<qr.size;col++)if(qr.dark(row,col))ctx.fillRect(x+(col+4)*module,y+(row+4)*module,module,module);
   }else if(e.type==='image'){
    const scale=Math.min(w/e.bitmap.width,h/e.bitmap.height);const iw=Math.max(1,Math.round(e.bitmap.width*scale)),ih=Math.max(1,Math.round(e.bitmap.height*scale));
    if(iw*ih>16000000)throw new Error('Reduce el tamaño de la imagen.');

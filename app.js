@@ -1,4 +1,4 @@
-import {rasterToZpl} from './converter.js';
+import {rasterToZpl,applyPrintSettings} from './converter.js';
 import {drawEditor,initEditor} from './editor.js';
 const $=id=>document.getElementById(id);
 let source=null,request=0,activeTab="image";
@@ -24,9 +24,9 @@ function render(){
  imageCtx.putImageData(new ImageData(raster.preview,iw,ih),0,0);ctx.drawImage(imageCanvas,Math.floor((w-iw)/2),Math.floor((h-ih)/2));
  }
  const result=rasterToZpl(ctx.getImageData(0,0,w,h).data,w,h);
- $('code').value=result.zpl;$('preview').hidden=false;$('empty').hidden=true;
+ $('code').value=applyPrintSettings(result.zpl,Number($('copies').value),$('speed').value===''?'':Number($('speed').value));$('preview').hidden=false;$('empty').hidden=true;
  $('copy').disabled=$('download').disabled=false;$('dimensions').textContent=`${w} × ${h} dots`;
- $('info').textContent=`${mmW} × ${mmH} mm · ${dpi} dpi`;status('Conversión lista. Puedes copiar o descargar el código.');
+ $('info').textContent=`${mmW} × ${mmH} mm · ${dpi} dpi · ${$('copies').value} etiqueta(s)`;status('Conversión lista. Puedes copiar o descargar el código.');
  }catch(error){clear();status(error.message);}
 }
 async function load(file){
@@ -40,7 +40,7 @@ async function load(file){
  }catch(error){status('No se pudo cargar la imagen. '+error.message);}
 }
 $('file').addEventListener('change',e=>load(e.target.files[0]));
-for(const id of ['width','height','dpi','threshold','invert','mode'])$(id).addEventListener('input',render);
+for(const id of ['width','height','dpi','threshold','invert','mode','copies','speed'])$(id).addEventListener('input',render);
 for(const event of ['dragover','dragleave','drop'])$('drop').addEventListener(event,e=>{e.preventDefault();$('drop').classList.toggle('dragging',event==='dragover');if(event==='drop')load(e.dataTransfer.files[0]);});
 $('copy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('code').value);status('Código copiado.');}catch{ $('code').select();status('Selecciona y copia el código con Ctrl+C o Cmd+C.');}});
 $('download').addEventListener('click',()=>{const url=URL.createObjectURL(new Blob([$('code').value],{type:'text/plain'}));const a=document.createElement('a');a.href=url;a.download='etiqueta.zpl';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status('Archivo ZPL descargado.');});

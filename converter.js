@@ -26,3 +26,9 @@ export function rasterToZpl(rgba,width,height,threshold=128,invert=false,mode="t
  const hex=Array.from(bytes,b=>b.toString(16).padStart(2,'0').toUpperCase()).join('');
  return {zpl:`^XA\n^PW${width}\n^LL${height}\n^FO0,0\n^GFA,${bytes.length},${bytes.length},${stride},${hex}\n^FS\n^XZ`,preview,bytes};
 }
+
+export function applyPrintSettings(zpl,copies=1,speed=''){
+ if(!Number.isInteger(copies)||copies<1||copies>9999)throw new Error('La cantidad debe ser un entero entre 1 y 9999 etiquetas.');
+ if(speed!==''&&(!Number.isInteger(speed)||speed<1||speed>14))throw new Error('La velocidad debe ser un entero entre 1 y 14 pulgadas por segundo.');
+ return zpl.replace('^XA\n','^XA\n'+(speed===''?'':`^PR${speed}\n`)).replace('\n^XZ',`\n^PQ${copies}\n^XZ`);
+}
