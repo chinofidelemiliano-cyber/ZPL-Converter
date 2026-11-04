@@ -1,13 +1,13 @@
-import {nativeElement,graphicField,nativeLabel} from './native.js?v=native-v6';
-import {rasterToZpl} from './converter.js?v=native-v6';
-import {code39} from './barcode.js?v=native-v6';
-import {makeQr} from './qr.js?v=native-v6';
-import {readMm,writeMm,unitLabel} from './units.js?v=native-v6';
-import {fonts,fontById} from './fonts.js?v=native-v6';
-import {barcodeContent,sequenceCount} from './sequence.js?v=native-v6';
-import {buildEditorJob} from './jobs.js?v=native-v6';
-import {guidedLayout} from './guided.js?v=native-v6';
-import {clampPosition} from './positioning.js?v=native-v6';
+import {nativeElement,graphicField,nativeLabel} from './native.js?v=native-v7';
+import {rasterToZpl} from './converter.js?v=native-v7';
+import {code39} from './barcode.js?v=native-v7';
+import {makeQr} from './qr.js?v=native-v7';
+import {readMm,writeMm,unitLabel} from './units.js?v=native-v7';
+import {fonts,fontById} from './fonts.js?v=native-v7';
+import {barcodeContent,sequenceCount} from './sequence.js?v=native-v7';
+import {buildEditorJob} from './jobs.js?v=native-v7';
+import {guidedLayout} from './guided.js?v=native-v7';
+import {clampPosition} from './positioning.js?v=native-v7';
 const $=id=>document.getElementById(id);
 const elements=[];let selected=null,redraw,report,nextId=1;const imageRasters=new WeakMap();let renderedEntries=[],renderedScene=[],positionTarget=null;let activeTool=null,freeLayout=false;const drafts=new Map();
 function current(){return elements.find(e=>e.id===selected);}
@@ -82,9 +82,9 @@ export function drawEditor(ctx,dpi,width,height){
  for(const original of working){
   const e=original.type==='barcode'?{...original,text:barcodeContent(original,0)}:original;
   if(['text','barcode','qr','url'].includes(e.type)&&!e.text.trim())continue;
-  if(!Number.isFinite(e.x+e.y)||e.x<0||e.y<0||e.x>200||e.y>300)throw new Error('La posición de los elementos debe estar entre 0 y 200 mm en X y 0 y 300 mm en Y.');
+  if(!Number.isFinite(e.x+e.y)||e.x<0||e.y<0||e.x>300||e.y>300)throw new Error('La posición de los elementos debe estar entre 0 y 300 mm en X y 0 y 300 mm en Y.');
   if(e.type==='text'&&(!Number.isFinite(e.size)||e.size<1||e.size>50))throw new Error('Usa un tamaño de texto de 1 a 50 mm.');
-  if(e.type!=='text'&&(!Number.isFinite(e.w+e.h)||e.w<1||e.w>200||e.h<1||e.h>300))throw new Error('El elemento debe medir entre 1 y 200 mm de ancho y entre 1 y 300 mm de alto.');
+  if(e.type!=='text'&&(!Number.isFinite(e.w+e.h)||e.w<1||e.w>300||e.h<1||e.h>300))throw new Error('El elemento debe medir entre 1 y 300 mm de ancho y entre 1 y 300 mm de alto.');
   const x=Math.round(e.x*unit),y=Math.round(e.y*unit),w=Math.round(e.w*unit),h=Math.round(e.h*unit);
   if(e.id===(positionTarget??selected)){$('fo-x').value=x;$('fo-y').value=y;if(e.id<0){writeMm('element-x',e.x);writeMm('element-y',e.y);}}
   let command=e.type==='image'?'':nativeElement(e,dpi,width,height);
