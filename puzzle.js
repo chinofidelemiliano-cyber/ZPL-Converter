@@ -1,5 +1,5 @@
-import {rasterToZpl,applyPrintSettings} from './converter.js?v=native-v8';
-import {applyMedia} from './media.js?v=native-v8';
+import {rasterToZpl,applyPrintSettings} from './converter.js?v=native-v9';
+import {applyMedia} from './media.js?v=native-v9';
 export function puzzleLayout(width,height,rows,cols){
  if(![width,height,rows,cols].every(Number.isInteger)||width<1||height<1||rows<1||rows>10||cols<1||cols>10)throw new Error('Usa de 1 a 10 filas y de 1 a 10 columnas.');
  if(width*height*rows*cols>16000000)throw new Error('El rompecabezas supera los 16 millones de puntos. Reduce filas, columnas, tamaño o resolución.');
@@ -11,7 +11,7 @@ export function fitImage(sw,sh,dw,dh,fit){
  return {x:(dw-sw*scale)/2,y:(dh-sh*scale)/2,width:sw*scale,height:sh*scale};
 }
 export function buildPuzzle(source,preview,options){
- const {width,height,rows,cols,fit,threshold,invert,mode,copies,speed,media}=options;
+ const {width,height,rows,cols,fit,threshold,invert,mode,copies,speed,media,thermal={}}=options;
  const layout=puzzleLayout(width,height,rows,cols);
  const canvas=document.createElement('canvas');canvas.width=layout.width;canvas.height=layout.height;
  const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.fillStyle='white';ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -28,7 +28,7 @@ export function buildPuzzle(source,preview,options){
  }
  const jobs=layout.tiles.map(tile=>{
   const result=rasterToZpl(ctx.getImageData(tile.x,tile.y,width,height).data,width,height);
-  return applyMedia(applyPrintSettings(result.zpl,copies,speed),media);
+  return applyMedia(applyPrintSettings(result.zpl,copies,speed,thermal),media);
  });
  preview.width=canvas.width;preview.height=canvas.height;const p=preview.getContext('2d');p.drawImage(canvas,0,0);
  // Guides belong only to the on-screen preview, never to the exported artwork.

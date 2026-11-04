@@ -1,13 +1,13 @@
-import {nativeElement,graphicField,nativeLabel} from './native.js?v=native-v8';
-import {rasterToZpl} from './converter.js?v=native-v8';
-import {code39} from './barcode.js?v=native-v8';
-import {makeQr} from './qr.js?v=native-v8';
-import {readMm,writeMm,unitLabel} from './units.js?v=native-v8';
-import {fonts,fontById} from './fonts.js?v=native-v8';
-import {barcodeContent,sequenceCount} from './sequence.js?v=native-v8';
-import {buildEditorJob} from './jobs.js?v=native-v8';
-import {guidedLayout} from './guided.js?v=native-v8';
-import {clampPosition} from './positioning.js?v=native-v8';
+import {nativeElement,graphicField,nativeLabel} from './native.js?v=native-v9';
+import {rasterToZpl} from './converter.js?v=native-v9';
+import {code39} from './barcode.js?v=native-v9';
+import {makeQr} from './qr.js?v=native-v9';
+import {readMm,writeMm,unitLabel} from './units.js?v=native-v9';
+import {fonts,fontById} from './fonts.js?v=native-v9';
+import {barcodeContent,sequenceCount} from './sequence.js?v=native-v9';
+import {buildEditorJob} from './jobs.js?v=native-v9';
+import {guidedLayout} from './guided.js?v=native-v9';
+import {clampPosition} from './positioning.js?v=native-v9';
 const $=id=>document.getElementById(id);
 const elements=[];let selected=null,redraw,report,nextId=1;const imageRasters=new WeakMap();let renderedEntries=[],renderedScene=[],positionTarget=null;let activeTool=null,freeLayout=false;const drafts=new Map();
 function current(){return elements.find(e=>e.id===selected);}
@@ -40,7 +40,7 @@ export function initEditor(render,status){
  const summary=document.createElement('summary');summary.textContent='Tamaño, material y opciones de impresión';container.append(summary);
  const units=document.querySelector('.unit-selector');units.before(container);
  for(const node of [units,document.querySelector('.settings-cards'),document.querySelector('.command-options')])container.append(node);
- settings.insertBefore($('editor-tools'),container);
+ settings.insertBefore($('editor-tools'),container);settings.insertBefore($('thermal-settings'),$('editor-tools'));
  $('free-layout').addEventListener('change',()=>{freeLayout=$('free-layout').checked;updateFocusedUi();properties();redraw();});
  for(const [id,key] of [['companion-enabled','captionEnabled'],['companion-text','captionText'],['companion-size','captionSize'],['auto-fit-element','autoLayout']])$(id).addEventListener('input',()=>{
   const e=current();if(!e)return;e[key]=id==='companion-enabled'||id==='auto-fit-element'?$(id).checked:id==='companion-size'?readMm(id):$(id).value;
@@ -145,7 +145,7 @@ export function useEditorFont(font){
 }
 export function addEditorElement(type){if(type==='image')$('editor-image').click();else chooseType(type);}
 
-export function editorPrintJob(width,height,dpi,copies,speed,media){return buildEditorJob(renderedEntries,width,height,dpi,copies,speed,media);}
+export function editorPrintJob(width,height,dpi,copies,speed,media,thermal={}){return buildEditorJob(renderedEntries,width,height,dpi,copies,speed,media,thermal);}
 
 const names={text:'Etiqueta de texto',box:'Etiqueta con recuadro',barcode:'Etiqueta de código de barras',qr:'Etiqueta de código QR',url:'Código QR con enlace',image:'Etiqueta con imagen'};
 function updateFocusedUi(){

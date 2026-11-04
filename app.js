@@ -1,15 +1,15 @@
-import {rasterToZpl,applyPrintSettings} from './converter.js?v=native-v8';
-import {drawEditor,initEditor,useEditorFont,addEditorElement,editorPrintJob,editorHasContent,editorEmptyMessage,editorScene,selectEditorItem,moveEditorItem,commitEditorPosition} from './editor.js?v=native-v8';
-import {initUnits,readMm,fromMm,unitLabel,writeMm} from './units.js?v=native-v8';
-import {mediaSettings,applyMedia} from './media.js?v=native-v8';
-import {buildPuzzle} from './puzzle.js?v=native-v8';
-import {initGallery} from './gallery.js?v=native-v8';
-import {installFieldHelp} from './field-help.js?v=native-v8';
-import {initPositioning} from './positioning.js?v=native-v8';
-import {currentPrinter,initPrinterCatalog} from './printer-ui.js?v=native-v8';
-import {validatePrinter} from './printers.js?v=native-v8';
-import {initZplViewer} from './zpl-viewer.js?v=native-v8';
-import {initImageCrop} from './crop.js?v=native-v8';
+import {rasterToZpl,applyPrintSettings} from './converter.js?v=native-v9';
+import {drawEditor,initEditor,useEditorFont,addEditorElement,editorPrintJob,editorHasContent,editorEmptyMessage,editorScene,selectEditorItem,moveEditorItem,commitEditorPosition} from './editor.js?v=native-v9';
+import {initUnits,readMm,fromMm,unitLabel,writeMm} from './units.js?v=native-v9';
+import {mediaSettings,applyMedia} from './media.js?v=native-v9';
+import {buildPuzzle} from './puzzle.js?v=native-v9';
+import {initGallery} from './gallery.js?v=native-v9';
+import {installFieldHelp} from './field-help.js?v=native-v9';
+import {initPositioning} from './positioning.js?v=native-v9';
+import {currentPrinter,initPrinterCatalog} from './printer-ui.js?v=native-v9';
+import {validatePrinter} from './printers.js?v=native-v9';
+import {initZplViewer} from './zpl-viewer.js?v=native-v9';
+import {initImageCrop} from './crop.js?v=native-v9';
 const $=id=>document.getElementById(id);
 let source=null,request=0,activeTab="image",positionController=null,cropController=null;
 initUnits(render);
@@ -17,6 +17,7 @@ function status(message){$('status').textContent=message;}
 function clear(){ $('puzzle-summary').textContent='';$('series-job-info').textContent='';$('series-job-info').hidden=true;$('sequence-preview').textContent='';$('element-commands').textContent=''; $('code').value='';$('copy').disabled=$('download').disabled=true;$('preview').hidden=true;$('empty').hidden=false; }
 function render(options={}){
  if(!['image','editor','puzzle'].includes(activeTab))return;
+ updateThermalUi();
  $('editor-error').hidden=true;
  updateStock();
  $('thresholdValue').textContent=$('threshold').value;
@@ -28,6 +29,7 @@ function render(options={}){
  if(w*h>16000000)throw new Error('La etiqueta es demasiado grande. Reduce el tamaño o la resolución.');
  if(source&&activeTab==='image')cropController?.sync(source,mmW/mmH);
  const media=mediaSettings($('media').value,readMm('gap'),mmH,dpi);
+ const thermal={method:$('print-method').value,darkness:$('darkness-mode').value==='custom'?($('darkness').value===''?NaN:Number($('darkness').value)):'',ribbon:$('print-method').value==='direct'?'unknown':$('ribbon-type').value,handling:$('handling-mode').value};
  const copies=Number($('copies').value),speed=$('speed').value;
  if(!source&&activeTab!=='editor')return;
  if(activeTab==='editor'&&!editorHasContent()){clear();$('empty').querySelector('p').textContent=editorEmptyMessage();status(editorEmptyMessage());return;}
@@ -35,7 +37,7 @@ function render(options={}){
  const canvas=$('preview');
  if(activeTab==='puzzle'){
   const rows=Number($('puzzle-rows').value),cols=Number($('puzzle-cols').value);
-  const result=buildPuzzle(source,canvas,{width:w,height:h,rows,cols,fit:$('puzzle-fit').value,threshold:Number($('threshold').value),invert:$('invert').checked,mode:$('mode').value,copies,speed,media:media.mode});
+  const result=buildPuzzle(source,canvas,{width:w,height:h,rows,cols,fit:$('puzzle-fit').value,threshold:Number($('threshold').value),invert:$('invert').checked,mode:$('mode').value,copies,speed,media:media.mode,thermal});
   $('code').value=result.zpl;canvas.hidden=false;$('empty').hidden=true;$('copy').disabled=$('download').disabled=false;
   const fmt=mm=>Number(fromMm(mm,$('units').value).toFixed(4));
   $('dimensions').textContent=`${rows} × ${cols} · ${result.count} piezas`;
@@ -59,7 +61,7 @@ function render(options={}){
  const zpl=activeTab==='editor'?nativeZpl:imageZpl??rasterToZpl(ctx.getImageData(0,0,w,h).data,w,h).zpl;
  if(typeof zpl!=='string')throw new Error('No se pudo generar ZPL nativo.');
  if(options.interactive){$('preview').hidden=false;$('empty').hidden=true;$('copy').disabled=$('download').disabled=true;return;}
- const job=activeTab==='editor'?editorPrintJob(w,h,dpi,copies,speed,media.mode):{zpl:applyMedia(applyPrintSettings(zpl,copies,speed),media.mode),total:copies,hasSequence:false};
+ const job=activeTab==='editor'?editorPrintJob(w,h,dpi,copies,speed,media.mode,thermal):{zpl:applyMedia(applyPrintSettings(zpl,copies,speed,thermal),media.mode),total:copies,hasSequence:false};
  $('code').value=job.zpl;$('series-job-info').hidden=!job.hasSequence;$('series-job-info').textContent=job.hasSequence?`${job.numbers} números distintos × ${copies} copias de cada uno = ${job.total} etiquetas. Se imprimen primero las copias de un número y luego el siguiente.`:'';
  $('copies').previousElementSibling.textContent=job.hasSequence?'Copias de cada número · ^PQ':'Cantidad de etiquetas · ^PQ';$('preview').hidden=false;$('empty').hidden=true;
  $('copy').disabled=$('download').disabled=false;$('dimensions').textContent=`${w} × ${h} dots`;
@@ -77,7 +79,7 @@ async function load(file){
  }catch(error){status('No se pudo cargar la imagen. '+error.message);}
 }
 $('file').addEventListener('change',e=>load(e.target.files[0]));
-for(const id of ['width','height','dpi','threshold','invert','mode','copies','speed','media','gap','puzzle-rows','puzzle-cols','puzzle-fit'])$(id).addEventListener('input',render);
+for(const id of ['width','height','dpi','threshold','invert','mode','copies','speed','media','gap','puzzle-rows','puzzle-cols','puzzle-fit','print-method','darkness-mode','darkness','ribbon-type','stock-type','handling-mode'])$(id).addEventListener('input',render);
 for(const event of ['dragover','dragleave','drop'])$('drop').addEventListener(event,e=>{e.preventDefault();$('drop').classList.toggle('dragging',event==='dragover');if(event==='drop')load(e.dataTransfer.files[0]);});
 $('copy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('code').value);status('Código copiado.');}catch{ $('code').select();status('Selecciona y copia el código con Ctrl+C o Cmd+C.');}});
 $('download').addEventListener('click',()=>{const url=URL.createObjectURL(new Blob([$('code').value],{type:'text/plain'}));const a=document.createElement('a');a.href=url;a.download=activeTab==='puzzle'?'rompecabezas.zpl':'etiqueta.zpl';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status('Archivo ZPL descargado.');});
@@ -121,4 +123,12 @@ function updateStock(){
   const fmt=mm=>Number(fromMm(mm,$('units').value).toFixed(4));
   $('stock-summary').textContent=mode==='gap'?`Largo ${fmt(readMm('height'))} + gap ${fmt(settings.gapMm)} = paso ${fmt(settings.pitchMm)} ${unitLabel()}.`:mode==='continuous'?'Material continuo: el avance corresponde al largo de la etiqueta.':'Se conserva la configuración de material de la impresora; el gap físico no se estima.';
  }catch(error){$('stock-summary').textContent=error.message;}
+}
+
+function updateThermalUi(){
+ const method=$('print-method').value,ribbon=$('ribbon-type');ribbon.disabled=method==='direct';if(method==='direct')ribbon.value='unknown';
+ $('darkness-field').hidden=$('darkness-mode').value!=='custom';
+ const notes={unknown:'Selecciona el consumible que instalaste. La aplicación no detecta ni cambia el ribbon físico.',wax:'Cera: habitual para etiquetas de papel. Confirma la combinación con tu proveedor.', 'wax-resin':'Cera/resina: habitual para papel tratado y algunos sintéticos. Verifica compatibilidad.',resin:'Resina: habitual para materiales sintéticos compatibles, como poliéster. Requiere una combinación de ribbon y etiqueta adecuada.'};
+ $('ribbon-note').textContent=method==='direct'?'Térmica directa: utiliza etiqueta termosensible y no utiliza ribbon.':notes[ribbon.value];
+ $('thermal-summary').textContent=(method==='direct'?'^MTD · térmica directa':method==='transfer'?'^MTT · transferencia térmica':'Método configurado en la impresora')+($('darkness-mode').value==='custom'?` · ~SD${$('darkness').value} · intensidad térmica (no °C)`:' · oscuridad configurada en la impresora')+'. El ribbon y el material son referencias del consumible, no comandos ZPL.';
 }

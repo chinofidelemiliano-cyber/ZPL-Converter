@@ -1,7 +1,7 @@
 import './vendor/JsBarcode.all.min.js';
-import {decodeGraphic} from './zpl-parser.js?v=native-v8';
-import {code39} from './barcode.js?v=native-v8';
-import {makeQr} from './qr.js?v=native-v8';
+import {decodeGraphic} from './zpl-parser.js?v=native-v9';
+import {code39} from './barcode.js?v=native-v9';
+import {makeQr} from './qr.js?v=native-v9';
 const fontFamily=font=>['H','E'].includes(font)?'monospace':'Arial, sans-serif';
 export function renderZplLabel(label,canvas){
  canvas.width=label.width;canvas.height=label.height;const ctx=canvas.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.imageSmoothingEnabled=false;

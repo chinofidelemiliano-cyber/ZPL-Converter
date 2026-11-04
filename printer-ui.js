@@ -1,4 +1,4 @@
-import {printerModels,profileById,customProfile,legacySpeedIps} from './printers.js?v=native-v8';
+import {printerModels,profileById,customProfile,legacySpeedIps} from './printers.js?v=native-v9';
 let selected=printerModels[0],custom=[];
 export const currentPrinter=()=>selected;
 export function initPrinterCatalog(onApply){

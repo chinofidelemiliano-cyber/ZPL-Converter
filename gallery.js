@@ -1,6 +1,6 @@
-import {fonts} from './fonts.js?v=native-v8';
-import {code39} from './barcode.js?v=native-v8';
-import {makeQr} from './qr.js?v=native-v8';
+import {fonts} from './fonts.js?v=native-v9';
+import {code39} from './barcode.js?v=native-v9';
+import {makeQr} from './qr.js?v=native-v9';
 export function initGallery(useFont,addElement){
  const grid=document.getElementById('font-gallery');
  for(const font of fonts){

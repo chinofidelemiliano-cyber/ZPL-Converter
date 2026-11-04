@@ -1,4 +1,4 @@
-import {code39} from './barcode.js?v=native-v8';
+import {code39} from './barcode.js?v=native-v9';
 export function barcodeContent(element,index=0){
  if(element.numberMode!=='sequence')return element.text||'';
  if(!Number.isInteger(index)||index<0)throw new Error('Índice de consecutivo inválido.');

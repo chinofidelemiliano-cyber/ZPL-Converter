@@ -1,6 +1,6 @@
-import {fontCommand} from './fonts.js?v=native-v8';
-import {code39} from './barcode.js?v=native-v8';
-import {makeQr,qrContent} from './qr.js?v=native-v8';
+import {fontCommand} from './fonts.js?v=native-v9';
+import {code39} from './barcode.js?v=native-v9';
+import {makeQr,qrContent} from './qr.js?v=native-v9';
 // Escape command delimiters and non-ASCII UTF-8 bytes in field content.
 export const fieldData=text=>Array.from(new TextEncoder().encode(text),b=>b>=32&&b<=126&&![94,126,92].includes(b)?String.fromCharCode(b):'\\'+b.toString(16).padStart(2,'0').toUpperCase()).join('');
 export function nativeElement(e,dpi,labelWidth,labelHeight){
