@@ -1,13 +1,13 @@
-import {nativeElement,graphicField,nativeLabel} from './native.js?v=native-v7';
-import {rasterToZpl} from './converter.js?v=native-v7';
-import {code39} from './barcode.js?v=native-v7';
-import {makeQr} from './qr.js?v=native-v7';
-import {readMm,writeMm,unitLabel} from './units.js?v=native-v7';
-import {fonts,fontById} from './fonts.js?v=native-v7';
-import {barcodeContent,sequenceCount} from './sequence.js?v=native-v7';
-import {buildEditorJob} from './jobs.js?v=native-v7';
-import {guidedLayout} from './guided.js?v=native-v7';
-import {clampPosition} from './positioning.js?v=native-v7';
+import {nativeElement,graphicField,nativeLabel} from './native.js?v=native-v8';
+import {rasterToZpl} from './converter.js?v=native-v8';
+import {code39} from './barcode.js?v=native-v8';
+import {makeQr} from './qr.js?v=native-v8';
+import {readMm,writeMm,unitLabel} from './units.js?v=native-v8';
+import {fonts,fontById} from './fonts.js?v=native-v8';
+import {barcodeContent,sequenceCount} from './sequence.js?v=native-v8';
+import {buildEditorJob} from './jobs.js?v=native-v8';
+import {guidedLayout} from './guided.js?v=native-v8';
+import {clampPosition} from './positioning.js?v=native-v8';
 const $=id=>document.getElementById(id);
 const elements=[];let selected=null,redraw,report,nextId=1;const imageRasters=new WeakMap();let renderedEntries=[],renderedScene=[],positionTarget=null;let activeTool=null,freeLayout=false;const drafts=new Map();
 function current(){return elements.find(e=>e.id===selected);}

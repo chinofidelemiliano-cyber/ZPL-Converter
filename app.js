@@ -1,16 +1,17 @@
-import {rasterToZpl,applyPrintSettings} from './converter.js?v=native-v7';
-import {drawEditor,initEditor,useEditorFont,addEditorElement,editorPrintJob,editorHasContent,editorEmptyMessage,editorScene,selectEditorItem,moveEditorItem,commitEditorPosition} from './editor.js?v=native-v7';
-import {initUnits,readMm,fromMm,unitLabel,writeMm} from './units.js?v=native-v7';
-import {mediaSettings,applyMedia} from './media.js?v=native-v7';
-import {buildPuzzle} from './puzzle.js?v=native-v7';
-import {initGallery} from './gallery.js?v=native-v7';
-import {installFieldHelp} from './field-help.js?v=native-v7';
-import {initPositioning} from './positioning.js?v=native-v7';
-import {currentPrinter,initPrinterCatalog} from './printer-ui.js?v=native-v7';
-import {validatePrinter} from './printers.js?v=native-v7';
-import {initZplViewer} from './zpl-viewer.js?v=native-v7';
+import {rasterToZpl,applyPrintSettings} from './converter.js?v=native-v8';
+import {drawEditor,initEditor,useEditorFont,addEditorElement,editorPrintJob,editorHasContent,editorEmptyMessage,editorScene,selectEditorItem,moveEditorItem,commitEditorPosition} from './editor.js?v=native-v8';
+import {initUnits,readMm,fromMm,unitLabel,writeMm} from './units.js?v=native-v8';
+import {mediaSettings,applyMedia} from './media.js?v=native-v8';
+import {buildPuzzle} from './puzzle.js?v=native-v8';
+import {initGallery} from './gallery.js?v=native-v8';
+import {installFieldHelp} from './field-help.js?v=native-v8';
+import {initPositioning} from './positioning.js?v=native-v8';
+import {currentPrinter,initPrinterCatalog} from './printer-ui.js?v=native-v8';
+import {validatePrinter} from './printers.js?v=native-v8';
+import {initZplViewer} from './zpl-viewer.js?v=native-v8';
+import {initImageCrop} from './crop.js?v=native-v8';
 const $=id=>document.getElementById(id);
-let source=null,request=0,activeTab="image",positionController=null;
+let source=null,request=0,activeTab="image",positionController=null,cropController=null;
 initUnits(render);
 function status(message){$('status').textContent=message;}
 function clear(){ $('puzzle-summary').textContent='';$('series-job-info').textContent='';$('series-job-info').hidden=true;$('sequence-preview').textContent='';$('element-commands').textContent=''; $('code').value='';$('copy').disabled=$('download').disabled=true;$('preview').hidden=true;$('empty').hidden=false; }
@@ -25,6 +26,7 @@ function render(options={}){
  const w=Math.round(mmW*dpi/25.4),h=Math.round(mmH*dpi/25.4);
  $('pw').value=w;$('ll').value=h;
  if(w*h>16000000)throw new Error('La etiqueta es demasiado grande. Reduce el tamaño o la resolución.');
+ if(source&&activeTab==='image')cropController?.sync(source,mmW/mmH);
  const media=mediaSettings($('media').value,readMm('gap'),mmH,dpi);
  const copies=Number($('copies').value),speed=$('speed').value;
  if(!source&&activeTab!=='editor')return;
@@ -43,17 +45,18 @@ function render(options={}){
  }
  canvas.width=w;canvas.height=h;
  const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.fillStyle='white';ctx.fillRect(0,0,w,h);
- let nativeZpl;
+ let nativeZpl,imageZpl;
  if(activeTab==="editor"){
  nativeZpl=drawEditor(ctx,dpi,w,h);
  }else{
- const scale=Math.min(w/source.width,h/source.height),iw=Math.max(1,Math.round(source.width*scale)),ih=Math.max(1,Math.round(source.height*scale));
+ const selectedArea=cropController?.selection();
+ const scale=Math.min(w/source.width,h/source.height),iw=selectedArea?w:Math.max(1,Math.round(source.width*scale)),ih=selectedArea?h:Math.max(1,Math.round(source.height*scale));
  const imageCanvas=document.createElement('canvas');imageCanvas.width=iw;imageCanvas.height=ih;
- const imageCtx=imageCanvas.getContext('2d',{willReadFrequently:true});imageCtx.drawImage(source,0,0,iw,ih);
+ const imageCtx=imageCanvas.getContext('2d',{willReadFrequently:true});if(selectedArea)imageCtx.drawImage(source,selectedArea.x,selectedArea.y,selectedArea.width,selectedArea.height,0,0,iw,ih);else imageCtx.drawImage(source,0,0,iw,ih);
  const raster=rasterToZpl(imageCtx.getImageData(0,0,iw,ih).data,iw,ih,Number($('threshold').value),$('invert').checked,$('mode').value);
- imageCtx.putImageData(new ImageData(raster.preview,iw,ih),0,0);ctx.drawImage(imageCanvas,Math.floor((w-iw)/2),Math.floor((h-ih)/2));
+ imageCtx.putImageData(new ImageData(raster.preview,iw,ih),0,0);ctx.drawImage(imageCanvas,Math.floor((w-iw)/2),Math.floor((h-ih)/2));if(selectedArea)imageZpl=raster.zpl;
  }
- const zpl=activeTab==='editor'?nativeZpl:rasterToZpl(ctx.getImageData(0,0,w,h).data,w,h).zpl;
+ const zpl=activeTab==='editor'?nativeZpl:imageZpl??rasterToZpl(ctx.getImageData(0,0,w,h).data,w,h).zpl;
  if(typeof zpl!=='string')throw new Error('No se pudo generar ZPL nativo.');
  if(options.interactive){$('preview').hidden=false;$('empty').hidden=true;$('copy').disabled=$('download').disabled=true;return;}
  const job=activeTab==='editor'?editorPrintJob(w,h,dpi,copies,speed,media.mode):{zpl:applyMedia(applyPrintSettings(zpl,copies,speed),media.mode),total:copies,hasSequence:false};
@@ -82,6 +85,7 @@ $('download').addEventListener('click',()=>{const url=URL.createObjectURL(new Bl
 for(const [id,measurement] of [['pw','width'],['ll','height']])$(id).addEventListener('input',()=>{
  const dots=$(id).value===''?NaN:Number($(id).value);writeMm(measurement,Number.isInteger(dots)?dots*25.4/Number($('dpi').value):NaN);render();
 });
+cropController=initImageCrop({onChange:()=>render(),onBusy:()=>{$('copy').disabled=$('download').disabled=true;status('Ajustando área: al soltar se actualizarán la vista previa y el ZPL.');}});
 initEditor(render,status);
 installFieldHelp();
 positionController=initPositioning({scene:editorScene,select:selectEditorItem,move:moveEditorItem,commit:commitEditorPosition});
@@ -98,6 +102,7 @@ function switchTab(tab,navigate=true){
  $('gallery').hidden=tab!=='gallery';$('models').hidden=tab!=='models';$('viewer').hidden=tab!=='viewer';$('workspace').hidden=['gallery','models','viewer'].includes(tab);
  if(['gallery','models','viewer'].includes(tab)){positionController?.refresh();return;}
  $('image-tools').hidden=$('image-adjustments').hidden=!['image','puzzle'].includes(tab);$('editor-tools').hidden=tab!=='editor';$('puzzle-tools').hidden=tab!=='puzzle';
+ $('image-area-controls').hidden=tab!=='image';
  $('print-settings').open=tab!=='editor';if(tab==='editor')$('zpl-output').open=false;
  $('preview-note').textContent=tab==='editor'?'Vista previa aproximada. Las fuentes, sus tamaños y los códigos nativos los interpreta la impresora.':'Vista previa del mapa de bits.';
  $('series-job-info').hidden=tab!=='editor';
