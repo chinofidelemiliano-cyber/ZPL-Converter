@@ -28,3 +28,11 @@ test('fonts and simulated bold remain native',()=>{
  assert.match(make({type:'text',text:'Hello',font:'mono'}),/\^AHN/);
  assert.equal((make({type:'text',text:'Hello',bold:true}).match(/\^FD/g)||[]).length,2);
 });
+test('all standard resident font identifiers export directly',()=>{
+ for(const [id,code] of [['arial','0'],['trebuchet','A'],['zebra-b','B'],['zebra-c','C'],['verdana','D'],['georgia','E'],['times','F'],['zebra-g','G'],['mono','H']])assert.ok(make({type:'text',text:'Texto',font:id}).includes('^A'+code+'N'));
+});
+test('installed fonts require a safe real printer-memory file reference',()=>{
+ assert.throws(()=>make({type:'text',text:'Texto',font:'installed'}));
+ assert.match(make({type:'text',text:'Texto',font:'installed',fontFile:'E:MYFONT.TTF'}),/\^A@N,40,24,E:MYFONT.TTF/);
+ for(const fontFile of ['^XA','E:../FONT.TTF','E:F.TTF^XZ'])assert.throws(()=>make({type:'text',text:'Texto',font:'installed',fontFile}));
+});

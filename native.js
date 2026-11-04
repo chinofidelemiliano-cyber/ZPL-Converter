@@ -1,6 +1,6 @@
-import {fontById} from './fonts.js';
-import {code39} from './barcode.js';
-import {makeQr} from './qr.js';
+import {fontCommand} from './fonts.js?v=native-v3';
+import {code39} from './barcode.js?v=native-v3';
+import {makeQr} from './qr.js?v=native-v3';
 // Encode every UTF-8 byte so user content cannot introduce ZPL commands.
 export const fieldData=text=>Array.from(new TextEncoder().encode(text),b=>b>=32&&b<=126&&![94,126,92].includes(b)?String.fromCharCode(b):'\\'+b.toString(16).padStart(2,'0').toUpperCase()).join('');
 export function nativeElement(e,dpi,labelWidth,labelHeight){
@@ -10,10 +10,10 @@ export function nativeElement(e,dpi,labelWidth,labelHeight){
  if(['text','barcode','qr','url'].includes(e.type)&&!e.text.trim())return '';
  if(e.type==='text'){
   const size=px(e.size);if(!Number.isInteger(size)||size<1||e.size>50)throw new Error('Tamaño de texto inválido.');
-  const font=fontById(e.font).zpl;
+  const font=fontCommand(e.font,size,e.fontFile);
   return e.text.split('\n').map((line,i)=>{
    const top=y+Math.round(i*size*1.2);
-   const make=left=>`^FO${left},${top}\n^A${font}N,${size},${Math.max(1,Math.round(size*.6))}\n^FH\\\n^FD${fieldData(line)}^FS`;
+   const make=left=>`^FO${left},${top}\n${font}\n^FH\\\n^FD${fieldData(line)}^FS`;
    return make(x)+(e.bold?'\n'+make(x+1):'');
   }).join('\n');
  }

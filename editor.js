@@ -1,36 +1,37 @@
-import {nativeElement,graphicField,nativeLabel} from './native.js';
-import {rasterToZpl} from './converter.js';
-import {code39} from './barcode.js';
-import {makeQr} from './qr.js';
-import {readMm,writeMm,unitLabel} from './units.js';
-import {fonts,fontById} from './fonts.js';
+import {nativeElement,graphicField,nativeLabel} from './native.js?v=native-v3';
+import {rasterToZpl} from './converter.js?v=native-v3';
+import {code39} from './barcode.js?v=native-v3';
+import {makeQr} from './qr.js?v=native-v3';
+import {readMm,writeMm,unitLabel} from './units.js?v=native-v3';
+import {fonts,fontById} from './fonts.js?v=native-v3';
 const $=id=>document.getElementById(id);
 const elements=[];let selected=null,redraw,report,nextId=1;
 function current(){return elements.find(e=>e.id===selected);}
 function updateList(){
  $('elements').replaceChildren();
- for(const e of elements){const button=document.createElement('button');button.textContent=({text:'Texto',box:'Recuadro',barcode:'Code 39',qr:'Código QR',url:'QR con enlace',image:'Imagen'})[e.type]+': '+(e.text||e.name||(e.type==='box'?'Borde':'Sin contenido'));button.classList.toggle('selected',e.id===selected);button.setAttribute('aria-pressed',String(e.id===selected));button.addEventListener('click',()=>{selected=e.id;updateList();properties();});$('elements').append(button);}
+ for(const e of elements){const button=document.createElement('button');button.textContent=({text:'Texto',box:'Recuadro',barcode:'Code 39',qr:'Código QR',url:'QR con enlace',image:'Imagen gráfica (^GFA)'})[e.type]+': '+(e.text||e.name||(e.type==='box'?'Borde':'Sin contenido'));button.classList.toggle('selected',e.id===selected);button.setAttribute('aria-pressed',String(e.id===selected));button.addEventListener('click',()=>{selected=e.id;updateList();properties();});$('elements').append(button);}
 }
 function properties(){
  const e=current();$('properties').hidden=!e;if(!e)return;
  $('content-field').hidden=!['text','barcode','qr','url'].includes(e.type);$('text-properties').hidden=e.type!=='text';$('size-properties').hidden=e.type==='text';$('box-properties').hidden=e.type!=='box';$('editor-image-properties').hidden=e.type!=='image';
  for(const [id,key] of Object.entries({'element-text':'text','element-x':'x','element-y':'y','element-w':'w','element-h':'h','font-size':'size','line-width':'line','element-mode':'mode'})){if(['x','y','w','h','size','line'].includes(key))writeMm(id,e[key]);else $(id).value=e[key]??'';}
  $('fo-x').value=Math.round(e.x*Number($('dpi').value)/25.4);$('fo-y').value=Math.round(e.y*Number($('dpi').value)/25.4);
- $('bold').checked=!!e.bold;$('italic').checked=!!e.italic;$('font-family').value=e.font||'arial';
+ $('bold').checked=!!e.bold;$('italic').checked=!!e.italic;$('font-family').value=e.font||'arial';$('font-file').value=e.fontFile||'';$('font-file-card').hidden=!fontById(e.font).requiresFile;
  $('element-text').placeholder=e.type==='url'?'https://tusitio.com':e.type==='barcode'?'Escribe tu código, por ejemplo PRODUCTO123':'Escribe tu contenido';
  $('content-help').textContent=e.type==='url'?'El QR abrirá este enlace al escanearlo.':e.type==='barcode'?'Code 39: mayúsculas A–Z, números y - . $ / + %.':e.type==='qr'?'Texto, números o información para escanear.':'Admite varias líneas y acentos.';
  $('element-h').closest('.field').hidden=['qr','url'].includes(e.type);
  $('element-w').previousElementSibling.textContent=['qr','url'].includes(e.type)?`Tamaño del QR (${unitLabel()})`:`Ancho (${unitLabel()})`;
 }
-function add(type,extra={}){const e={id:nextId++,type,x:5,y:5,w:40,h:15,size:5,line:.4,bold:false,italic:false,font:'arial',mode:'threshold',text:'',...(['qr','url'].includes(type)?{w:25,h:25}:{}),...extra};elements.push(e);selected=e.id;updateList();properties();redraw();if(['text','barcode','qr','url'].includes(type))report(type==='url'?'Escribe el enlace web de tu QR en el campo Contenido.':'Escribe el contenido del elemento en el campo Contenido.');}
+function add(type,extra={}){const e={id:nextId++,type,x:5,y:5,w:40,h:15,size:5,line:.4,bold:false,italic:false,font:'arial',fontFile:'',mode:'threshold',text:'',...(['qr','url'].includes(type)?{w:25,h:25}:{}),...extra};elements.push(e);selected=e.id;updateList();properties();redraw();if(['text','barcode','qr','url'].includes(type))report(type==='url'?'Escribe el enlace web de tu QR en el campo Contenido.':'Escribe el contenido del elemento en el campo Contenido.');}
 export function initEditor(render,status){
  redraw=render;report=status;
+ $('new-label').addEventListener('click',()=>{for(const e of elements)e.bitmap?.close();elements.length=0;selected=null;updateList();properties();redraw();report('Etiqueta nueva. Añade texto, códigos o recuadros: se exportarán como ZPL nativo.');});
  for(const [id,key,target] of [['fo-x','x','element-x'],['fo-y','y','element-y']])$(id).addEventListener('input',()=>{
   const e=current();if(!e)return;const dots=$(id).value===''?NaN:Number($(id).value);e[key]=Number.isInteger(dots)?dots*25.4/Number($('dpi').value):NaN;writeMm(target,e[key]);redraw();
  });
  for(const font of fonts){const option=document.createElement('option');option.value=font.id;option.textContent=font.name;$('font-family').append(option);}
  for(const type of ['text','box','barcode','qr','url'])$('add-'+type).addEventListener('click',()=>add(type));
- for(const [id,key] of Object.entries({'element-text':'text','element-x':'x','element-y':'y','element-w':'w','element-h':'h','font-size':'size','line-width':'line','element-mode':'mode','bold':'bold','italic':'italic','font-family':'font'}))$(id).addEventListener('input',()=>{const e=current();if(!e)return;e[key]=['bold','italic'].includes(id)?$(id).checked:['text','mode','font'].includes(key)?$(id).value:readMm(id);updateList();if(['x','y'].includes(key))$('fo-'+key).value=Math.round(e[key]*Number($('dpi').value)/25.4);redraw();});
+ for(const [id,key] of Object.entries({'element-text':'text','element-x':'x','element-y':'y','element-w':'w','element-h':'h','font-size':'size','line-width':'line','element-mode':'mode','bold':'bold','italic':'italic','font-family':'font','font-file':'fontFile'}))$(id).addEventListener('input',()=>{const e=current();if(!e)return;e[key]=['bold','italic'].includes(id)?$(id).checked:['text','mode','font','fontFile'].includes(key)?$(id).value:readMm(id);updateList();if(key==='font')$('font-file-card').hidden=!fontById(e.font).requiresFile;if(['x','y'].includes(key))$('fo-'+key).value=Math.round(e[key]*Number($('dpi').value)/25.4);redraw();});
  $('delete-element').addEventListener('click',()=>{const e=current();if(!e)return;e.bitmap?.close();elements.splice(elements.indexOf(e),1);selected=elements.at(-1)?.id??null;updateList();properties();redraw();});
  $('editor-image').addEventListener('change',async event=>{
   const file=event.target.files[0];if(!file)return;
@@ -79,7 +80,10 @@ export function drawEditor(ctx,dpi,width,height){
   }
   fields.push(command);if(e.id===selected)$('element-commands').textContent=command;
  }
- return nativeLabel(fields,width,height);
+ const label=nativeLabel(fields,width,height),images=elements.filter(e=>e.type==='image').length;
+ if(!images&&label.includes('^GFA'))throw new Error('La etiqueta nativa no debe contener gráficos.');
+ $('editor-export-info').textContent=images?`Etiqueta mixta: ${images} imagen(es) con ^GFA. El texto y los códigos usan comandos nativos.`:'ZPL nativo: texto, QR, barras y recuadros. Sin ^GFA ni datos de imagen.';
+ return label;
 }
 
 export function useEditorFont(font){

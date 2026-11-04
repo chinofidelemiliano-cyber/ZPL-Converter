@@ -1,6 +1,6 @@
-import {fonts} from './fonts.js';
-import {code39} from './barcode.js';
-import {makeQr} from './qr.js';
+import {fonts} from './fonts.js?v=native-v3';
+import {code39} from './barcode.js?v=native-v3';
+import {makeQr} from './qr.js?v=native-v3';
 export function initGallery(useFont,addElement){
  const grid=document.getElementById('font-gallery');
  for(const font of fonts){
@@ -8,7 +8,7 @@ export function initGallery(useFont,addElement){
   const title=document.createElement('h3');title.textContent=font.name;
   const sample=document.createElement('p');sample.className='font-sample';sample.style.fontFamily=font.family;sample.textContent='Mi etiqueta · Café 123';
   const styles=document.createElement('p');styles.className='font-styles';styles.style.fontFamily=font.family;
-  const bold=document.createElement('strong');bold.textContent='Negrita';const command=document.createElement('code');command.textContent='^A'+font.zpl;styles.append(bold,command);
+  const bold=document.createElement('strong');bold.textContent='Negrita';const command=document.createElement('code');command.textContent=font.requiresFile?'^A@':'^A'+font.zpl;styles.append(bold,command);
   const description=document.createElement('p');description.className='hint';description.textContent=font.description;
   const button=document.createElement('button');button.textContent='Usar esta fuente';button.addEventListener('click',()=>useFont(font.id));
   card.append(title,sample,styles,description,button);grid.append(card);

@@ -1,9 +1,9 @@
-import {rasterToZpl,applyPrintSettings} from './converter.js';
-import {drawEditor,initEditor,useEditorFont,addEditorElement} from './editor.js';
-import {initUnits,readMm,fromMm,unitLabel,writeMm} from './units.js';
-import {mediaSettings,applyMedia} from './media.js';
-import {buildPuzzle} from './puzzle.js';
-import {initGallery} from './gallery.js';
+import {rasterToZpl,applyPrintSettings} from './converter.js?v=native-v3';
+import {drawEditor,initEditor,useEditorFont,addEditorElement} from './editor.js?v=native-v3';
+import {initUnits,readMm,fromMm,unitLabel,writeMm} from './units.js?v=native-v3';
+import {mediaSettings,applyMedia} from './media.js?v=native-v3';
+import {buildPuzzle} from './puzzle.js?v=native-v3';
+import {initGallery} from './gallery.js?v=native-v3';
 const $=id=>document.getElementById(id);
 let source=null,request=0,activeTab="image";
 initUnits(render);
@@ -44,7 +44,8 @@ function render(){
  const raster=rasterToZpl(imageCtx.getImageData(0,0,iw,ih).data,iw,ih,Number($('threshold').value),$('invert').checked,$('mode').value);
  imageCtx.putImageData(new ImageData(raster.preview,iw,ih),0,0);ctx.drawImage(imageCanvas,Math.floor((w-iw)/2),Math.floor((h-ih)/2));
  }
- const zpl=nativeZpl??rasterToZpl(ctx.getImageData(0,0,w,h).data,w,h).zpl;
+ const zpl=activeTab==='editor'?nativeZpl:rasterToZpl(ctx.getImageData(0,0,w,h).data,w,h).zpl;
+ if(typeof zpl!=='string')throw new Error('No se pudo generar ZPL nativo.');
  $('code').value=applyMedia(applyPrintSettings(zpl,copies,speed),media.mode);$('preview').hidden=false;$('empty').hidden=true;
  $('copy').disabled=$('download').disabled=false;$('dimensions').textContent=`${w} × ${h} dots`;
  $('info').textContent=`${Number(fromMm(mmW,$('units').value).toFixed(4))} × ${Number(fromMm(mmH,$('units').value).toFixed(4))} ${unitLabel()} · ${dpi} dpi · ${$('copies').value} etiqueta(s)`;status('Conversión lista. Puedes copiar o descargar el código.');
@@ -70,8 +71,13 @@ for(const [id,measurement] of [['pw','width'],['ll','height']])$(id).addEventLis
  const dots=$(id).value===''?NaN:Number($(id).value);writeMm(measurement,Number.isInteger(dots)?dots*25.4/Number($('dpi').value):NaN);render();
 });
 initEditor(render,status);
-function switchTab(tab){
- for(const t of ['image','editor','puzzle','gallery']){ $('tab-'+t).classList.toggle('active',t===tab);$('tab-'+t).setAttribute('aria-pressed',String(t===tab)); }
+const routes={image:'/index.html',editor:'/editor.html',puzzle:'/rompecabezas.html',gallery:'/fuentes.html'};
+const sections={image:['Imagen a ZPL','Convierte tus imágenes a blanco y negro o grises con puntos.'],editor:['Crea tu etiqueta desde cero','Texto, QR, códigos de barras y recuadros con comandos ZPL nativos.'],puzzle:['Rompecabezas de etiquetas','Divide una imagen completa en piezas para imprimir y ensamblar.'],gallery:['Fuentes y muestrario','Explora fuentes residentes y elementos para tu impresora Zebra.']};
+function switchTab(tab,navigate=true){
+ if(navigate&&location.pathname!==routes[tab])history.pushState({section:tab},'',routes[tab]);
+ document.body.dataset.page=tab;document.title=sections[tab][0]+' · Label Studio';$('section-title').textContent=sections[tab][0];$('section-description').textContent=sections[tab][1];
+
+ for(const t of ['image','editor','puzzle','gallery']){ $('tab-'+t).classList.toggle('active',t===tab);$('tab-'+t).setAttribute('aria-pressed',String(t===tab));if(t===tab)$('tab-'+t).setAttribute('aria-current','page');else $('tab-'+t).removeAttribute('aria-current'); }
  $('gallery').hidden=tab!=='gallery';$('workspace').hidden=tab==='gallery';
  if(tab==='gallery')return;
  activeTab=tab;
@@ -81,7 +87,9 @@ function switchTab(tab){
  $('copies').previousElementSibling.textContent=tab==='puzzle'?'Copias por pieza · ^PQ':'Cantidad de etiquetas · ^PQ';
  clear();render();if(tab!=='editor'&&!source)status('Carga una imagen para empezar.');
 }
-for(const tab of ['image','editor','puzzle','gallery'])$('tab-'+tab).addEventListener('click',()=>switchTab(tab));
+for(const tab of ['image','editor','puzzle','gallery'])$('tab-'+tab).addEventListener('click',event=>{if(event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;event.preventDefault();switchTab(tab);});
+addEventListener('popstate',()=>switchTab(Object.keys(routes).find(key=>routes[key].replace('.html','')===location.pathname.replace('.html',''))||'image',false));
+switchTab(document.body.dataset.page||'image',false);
 initGallery(font=>{switchTab('editor');useEditorFont(font);},type=>{switchTab('editor');addEditorElement(type);});
 
 function updateStock(){
