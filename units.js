@@ -10,7 +10,7 @@ export function writeMm(id,mm){
  input.value=Number.isFinite(mm)?String(Number(fromMm(mm,unit).toFixed(unit==='in'?6:4))):'';
 }
 export function initUnits(onChange){
- for(const id of ['width','height','element-x','element-y','element-w','element-h','font-size','line-width']){
+ for(const id of ['width','height','gap','element-x','element-y','element-w','element-h','font-size','line-width']){
   const input=document.getElementById(id);
   const field={mm:input.value===''?NaN:Number(input.value),min:input.getAttribute('min'),max:input.getAttribute('max'),step:input.step};fields.set(id,field);
   input.addEventListener('input',()=>{field.mm=input.value===''?NaN:toMm(Number(input.value),unit);});

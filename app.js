@@ -1,21 +1,37 @@
 import {rasterToZpl,applyPrintSettings} from './converter.js';
 import {drawEditor,initEditor,useEditorFont,addEditorElement} from './editor.js';
 import {initUnits,readMm,fromMm,unitLabel} from './units.js';
+import {mediaSettings,applyMedia} from './media.js';
+import {buildPuzzle} from './puzzle.js';
 import {initGallery} from './gallery.js';
 const $=id=>document.getElementById(id);
 let source=null,request=0,activeTab="image";
 initUnits(render);
 function status(message){$('status').textContent=message;}
-function clear(){ $('code').value='';$('copy').disabled=$('download').disabled=true;$('preview').hidden=true;$('empty').hidden=false; }
+function clear(){ $('puzzle-summary').textContent=''; $('code').value='';$('copy').disabled=$('download').disabled=true;$('preview').hidden=true;$('empty').hidden=false; }
 function render(){
+ updateStock();
  $('thresholdValue').textContent=$('threshold').value;
- if(!source&&activeTab==="image")return;
+ if(!source&&activeTab!=="editor")return;
  try{
  const mmW=readMm('width'),mmH=readMm('height'),dpi=Number($('dpi').value);
  if(mmW<1||mmW>200||mmH<1||mmH>300||!Number.isFinite(mmW+mmH))throw new Error('Usa un ancho entre 1 y 200 mm y un alto entre 1 y 300 mm.');
  const w=Math.round(mmW*dpi/25.4),h=Math.round(mmH*dpi/25.4);
  if(w*h>16000000)throw new Error('La etiqueta es demasiado grande. Reduce el tamaño o la resolución.');
- const canvas=$('preview');canvas.width=w;canvas.height=h;
+ const media=mediaSettings($('media').value,readMm('gap'),mmH,dpi);
+ const copies=Number($('copies').value),speed=$('speed').value===''?'':Number($('speed').value);
+ const canvas=$('preview');
+ if(activeTab==='puzzle'){
+  const rows=Number($('puzzle-rows').value),cols=Number($('puzzle-cols').value);
+  const result=buildPuzzle(source,canvas,{width:w,height:h,rows,cols,fit:$('puzzle-fit').value,threshold:Number($('threshold').value),invert:$('invert').checked,mode:$('mode').value,copies,speed,media:media.mode});
+  $('code').value=result.zpl;canvas.hidden=false;$('empty').hidden=true;$('copy').disabled=$('download').disabled=false;
+  const fmt=mm=>Number(fromMm(mm,$('units').value).toFixed(4));
+  $('dimensions').textContent=`${rows} × ${cols} · ${result.count} piezas`;
+  $('info').textContent=`Cada pieza: ${fmt(mmW)} × ${fmt(mmH)} ${unitLabel()} · ${dpi} dpi`;
+  $('puzzle-summary').textContent=`Imagen armada: ${fmt(mmW*cols)} × ${fmt(mmH*rows)} ${unitLabel()}. ${result.count} piezas distintas × ${copies} copias = ${result.count*copies} etiquetas. Avance estimado del rollo: ${fmt(media.pitchMm*result.count*copies)} ${unitLabel()}${media.mode==='printer'?' (sin incluir separaciones desconocidas)':''}.`;
+  status('Rompecabezas listo. El archivo ZPL incluye todas las piezas en orden.');return;
+ }
+ canvas.width=w;canvas.height=h;
  const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.fillStyle='white';ctx.fillRect(0,0,w,h);
  if(activeTab==="editor"){
  drawEditor(ctx,dpi,w,h);
@@ -27,7 +43,7 @@ function render(){
  imageCtx.putImageData(new ImageData(raster.preview,iw,ih),0,0);ctx.drawImage(imageCanvas,Math.floor((w-iw)/2),Math.floor((h-ih)/2));
  }
  const result=rasterToZpl(ctx.getImageData(0,0,w,h).data,w,h);
- $('code').value=applyPrintSettings(result.zpl,Number($('copies').value),$('speed').value===''?'':Number($('speed').value));$('preview').hidden=false;$('empty').hidden=true;
+ $('code').value=applyMedia(applyPrintSettings(result.zpl,copies,speed),media.mode);$('preview').hidden=false;$('empty').hidden=true;
  $('copy').disabled=$('download').disabled=false;$('dimensions').textContent=`${w} × ${h} dots`;
  $('info').textContent=`${Number(fromMm(mmW,$('units').value).toFixed(4))} × ${Number(fromMm(mmH,$('units').value).toFixed(4))} ${unitLabel()} · ${dpi} dpi · ${$('copies').value} etiqueta(s)`;status('Conversión lista. Puedes copiar o descargar el código.');
  }catch(error){clear();status(error.message);}
@@ -43,19 +59,29 @@ async function load(file){
  }catch(error){status('No se pudo cargar la imagen. '+error.message);}
 }
 $('file').addEventListener('change',e=>load(e.target.files[0]));
-for(const id of ['width','height','dpi','threshold','invert','mode','copies','speed'])$(id).addEventListener('input',render);
+for(const id of ['width','height','dpi','threshold','invert','mode','copies','speed','media','gap','puzzle-rows','puzzle-cols','puzzle-fit'])$(id).addEventListener('input',render);
 for(const event of ['dragover','dragleave','drop'])$('drop').addEventListener(event,e=>{e.preventDefault();$('drop').classList.toggle('dragging',event==='dragover');if(event==='drop')load(e.dataTransfer.files[0]);});
 $('copy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('code').value);status('Código copiado.');}catch{ $('code').select();status('Selecciona y copia el código con Ctrl+C o Cmd+C.');}});
-$('download').addEventListener('click',()=>{const url=URL.createObjectURL(new Blob([$('code').value],{type:'text/plain'}));const a=document.createElement('a');a.href=url;a.download='etiqueta.zpl';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status('Archivo ZPL descargado.');});
+$('download').addEventListener('click',()=>{const url=URL.createObjectURL(new Blob([$('code').value],{type:'text/plain'}));const a=document.createElement('a');a.href=url;a.download=activeTab==='puzzle'?'rompecabezas.zpl':'etiqueta.zpl';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status('Archivo ZPL descargado.');});
 
 initEditor(render,status);
 function switchTab(tab){
- for(const t of ['image','editor','gallery']){ $('tab-'+t).classList.toggle('active',t===tab);$('tab-'+t).setAttribute('aria-pressed',String(t===tab)); }
+ for(const t of ['image','editor','puzzle','gallery']){ $('tab-'+t).classList.toggle('active',t===tab);$('tab-'+t).setAttribute('aria-pressed',String(t===tab)); }
  $('gallery').hidden=tab!=='gallery';$('workspace').hidden=tab==='gallery';
  if(tab==='gallery')return;
  activeTab=tab;
- $('image-tools').hidden=$('image-adjustments').hidden=tab!=='image';$('editor-tools').hidden=tab!=='editor';
- clear();render();if(tab==='image'&&!source)status('Carga una imagen para empezar.');
+ $('image-tools').hidden=$('image-adjustments').hidden=!['image','puzzle'].includes(tab);$('editor-tools').hidden=tab!=='editor';$('puzzle-tools').hidden=tab!=='puzzle';
+ $('copies').previousElementSibling.textContent=tab==='puzzle'?'Copias por pieza':'Cantidad de etiquetas';
+ clear();render();if(tab!=='editor'&&!source)status('Carga una imagen para empezar.');
 }
-for(const tab of ['image','editor','gallery'])$('tab-'+tab).addEventListener('click',()=>switchTab(tab));
+for(const tab of ['image','editor','puzzle','gallery'])$('tab-'+tab).addEventListener('click',()=>switchTab(tab));
 initGallery(font=>{switchTab('editor');useEditorFont(font);},type=>{switchTab('editor');addEditorElement(type);});
+
+function updateStock(){
+ const mode=$('media').value;$('gap-field').hidden=mode!=='gap';$('gap-diagram').hidden=mode!=='gap';
+ try{
+  const settings=mediaSettings(mode,readMm('gap'),readMm('height'),Number($('dpi').value));
+  const fmt=mm=>Number(fromMm(mm,$('units').value).toFixed(4));
+  $('stock-summary').textContent=mode==='gap'?`Largo ${fmt(readMm('height'))} + gap ${fmt(settings.gapMm)} = paso ${fmt(settings.pitchMm)} ${unitLabel()}.`:mode==='continuous'?'Material continuo: el avance corresponde al largo de la etiqueta.':'Se conserva la configuración de material de la impresora; el gap físico no se estima.';
+ }catch(error){$('stock-summary').textContent=error.message;}
+}
